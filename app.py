@@ -24,6 +24,7 @@ from reportlab.lib.pagesizes import A4
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from asgiref.wsgi import WsgiToAsgi
+import requests
 
 # Flask ve async ayarları
 app = Flask(__name__)
@@ -227,149 +228,134 @@ class InterviewAssistant(VoiceAssistant):
         }
         self.start_time = datetime.now()
         self.openai_client = OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
+        self.current_question_index = 0
+        self.interview_questions = []
         
         self.reports_dir = "reports"
         if not os.path.exists(self.reports_dir):
             os.makedirs(self.reports_dir)
 
+    def set_interview_details(self, candidate_name, position):
+        self.candidate_name = candidate_name
+        self.position = position
+        # Pozisyona göre soruları hazırla
+        self._prepare_interview_questions()
 
-
-
-    async def get_gpt_response(self, text):
-        """Mülakat bağlamında GPT yanıtını al"""
+    def _prepare_interview_questions(self):
+        """Pozisyona göre mülakat sorularını hazırla"""
         try:
-            if not text:
-                logger.warning("Boş metin için GPT yanıtı istenemez")
-                return None
-                
-            logger.debug("GPT isteği hazırlanıyor...")
+            prompt = f"""
+            {self.position} pozisyonu için aşağıdaki sırayla 10 adet mülakat sorusu hazırla:
             
-            # Mülakat bağlamını oluştur
-            messages = [
-                {"role": "system", "content": f"""Sen profesyonel bir mülakat uzmanısın. 
-                {self.position} pozisyonu için {self.candidate_name} ile mülakat yapıyorsun.
-                
-                Lütfen şu kurallara göre yanıt ver:
-                1. Her zaman profesyonel ve nazik ol
-                2. Teknik sorular sor ve cevapları değerlendir
-                3. Adayın iletişim becerilerini ve özgüvenini gözlemle
-                4. Yanıtların kısa ve öz olsun (2-3 cümle)
-                5. Türkçe yanıt ver
-                
-                Pozisyon: {self.position}
-                Aday: {self.candidate_name}
-                """},
-                *[{"role": m["role"], "content": m["content"]} for m in self.conversation_history[-5:]],
-                {"role": "user", "content": text}
-            ]
+            1. Tanışma ve Genel Bilgiler:
+               - Kendinizi tanıtma ve kariyer hedefleri
+               
+            2-3. Tecrübe ve Geçmiş Projeler:
+               - Önceki iş deneyimleri
+               - Proje başarıları
+               
+            4-6. Teknik Sorular:
+               - Pozisyona özel teknik yetkinlikler
+               - Problem çözme yaklaşımı
+               - Teknik araçlar ve metodolojiler
+               
+            7-8. Problem Çözme ve Analitik Düşünme:
+               - Karşılaşılan zorluklar ve çözümler
+               - Karar verme süreçleri
+               
+            9-10. Kişisel Gelişim ve Hedefler:
+               - Gelecek planları
+               - Kendini geliştirme alanları
             
-            # GPT yanıtını al
-            response = await asyncio.get_event_loop().run_in_executor(
-                self.executor,
-                lambda: self.openai_client.chat.completions.create(
-                    model="gpt-3.5-turbo",
-                    messages=messages,
-                    temperature=0.7,
-                    max_tokens=150,  # Daha uzun yanıtlar için
-                    presence_penalty=0.6,  # Tekrarları azalt
-                    frequency_penalty=0.3  # Çeşitliliği artır
-                )
+            Soruları JSON formatında döndür:
+            {{"sorular": ["soru1", "soru2", ...]}}
+            
+            Her soru profesyonel ve nazik bir dille sorulmalı.
+            """
+            
+            response = self.openai_client.chat.completions.create(
+                model="gpt-3.5-turbo",
+                messages=[
+                    {"role": "system", "content": "Sen deneyimli bir İK uzmanısın. Mülakatları profesyonel ve yapıcı bir şekilde yönetirsin."},
+                    {"role": "user", "content": prompt}
+                ],
+                temperature=0.7
             )
             
-            # Yanıtı al
-            response_text = response.choices[0].message.content
+            questions = json.loads(response.choices[0].message.content)
+            self.interview_questions = questions["sorular"]
             
-            # Konuşma geçmişini güncelle
-            self.conversation_history.extend([
-                {"role": "user", "content": text},
-                {"role": "assistant", "content": response_text}
-            ])
+            # İlk soruyu ekle
+            self.conversation_history.append({
+                "role": "assistant",
+                "content": f"Merhaba {self.candidate_name}, {self.position} pozisyonu için mülakatımıza hoş geldiniz. " + self.interview_questions[0]
+            })
+            self.current_question_index = 1
             
-            # Duygu analizi yap
-            await self._analyze_sentiment(text)
-            
-            logger.debug(f"GPT yanıtı alındı: {response_text[:50]}...")
-            return response_text
+            logger.info(f"Mülakat soruları hazırlandı: {len(self.interview_questions)} soru")
             
         except Exception as e:
-            logger.error(f"GPT yanıt hatası: {str(e)}")
-            return None
-
-
-    # 1. İlk olarak yardımcı metodları ekle
-    def _create_system_message(self):
-        """Mülakat için özel sistem mesajını oluştur"""
-        return f"""Sen profesyonel bir mülakat uzmanısın. Görevin {self.position} pozisyonu için {self.candidate_name} ile mülakat yapmak.
-
-        Lütfen şu kurallara göre yanıt ver:
-        1. Her zaman profesyonel ve nazik ol
-        2. Teknik sorular sor ve cevapları değerlendir
-        3. Adayın iletişim becerilerini ve özgüvenini gözlemle
-        4. Yanıtların kısa ve öz olsun (2-3 cümle)
-        5. Türkçe yanıt ver
-        
-        Pozisyon: {self.position}
-        Aday: {self.candidate_name}
-        """
-
-    def _get_conversation_context(self, current_text):
-        """Mülakat bağlamını oluştur"""
-        messages = [
-            {"role": "system", "content": self._create_system_message()},
-        ]
-        
-        # Son 5 mesajı ekle (bağlam için)
-        recent_history = self.conversation_history[-5:] if self.conversation_history else []
-        messages.extend(recent_history)
-        
-        # Yeni mesajı ekle
-        messages.append({"role": "user", "content": current_text})
-        
-        return messages
+            logger.error(f"Soru hazırlama hatası: {str(e)}")
+            # Varsayılan sorular
+            self.interview_questions = [
+                "Kendinizden ve kariyerinizden bahseder misiniz?",
+                "Bu pozisyona neden başvurdunuz?",
+                "Önceki iş deneyimlerinizden bahseder misiniz?",
+                "Teknik becerileriniz nelerdir?",
+                "Zorlu bir iş durumunu nasıl çözdüğünüzü anlatır mısınız?",
+                "Gelecekteki kariyer hedefleriniz nelerdir?"
+            ]
+            self.conversation_history.append({
+                "role": "assistant",
+                "content": f"Merhaba {self.candidate_name}, {self.position} pozisyonu için mülakatımıza hoş geldiniz. " + self.interview_questions[0]
+            })
+            self.current_question_index = 1
 
     async def get_gpt_response(self, text):
-        """Mülakat bağlamında GPT yanıtını al"""
+        """Mülakat bağlamında GPT yanıtını al ve bir sonraki soruyu hazırla"""
         try:
             if not text:
                 logger.warning("Boş metin için GPT yanıtı istenemez")
                 return None
                 
-            logger.debug("GPT isteği hazırlanıyor...")
+            # Cevabı değerlendir
+            evaluation_prompt = f"""
+            Aday Yanıtı: {text}
             
-            # Mülakat bağlamını oluştur
-            messages = [
-                {"role": "system", "content": f"""Sen profesyonel bir mülakat uzmanısın. 
-                {self.position} pozisyonu için {self.candidate_name} ile mülakat yapıyorsun.
-                Lütfen adayın cevaplarını değerlendir ve yapıcı geri bildirimler ver.
-                Yanıtların kısa ve öz olsun."""},
-                *[{"role": m["role"], "content": m["content"]} for m in self.conversation_history[-5:]],
-                {"role": "user", "content": text}
-            ]
+            Lütfen bu yanıtı değerlendir ve yapıcı bir geri bildirim ver.
+            Yanıt kısa (2-3 cümle) ve motive edici olmalı.
+            """
             
-            # GPT yanıtını al
-            response = await asyncio.get_event_loop().run_in_executor(
+            evaluation_response = await asyncio.get_event_loop().run_in_executor(
                 self.executor,
                 lambda: self.openai_client.chat.completions.create(
                     model="gpt-3.5-turbo",
-                    messages=messages,
+                    messages=[
+                        {"role": "system", "content": "Sen bir mülakat uzmanısın. Sorularını sırayla sor ve her yanıtı değerlendir."},
+                        {"role": "user", "content": evaluation_prompt}
+                    ],
                     temperature=0.7,
-                    max_tokens=150,  # Daha uzun yanıtlar için
-                    presence_penalty=0.6,  # Tekrarları azalt
-                    frequency_penalty=0.3  # Çeşitliliği artır
+                    max_tokens=150
                 )
             )
             
-            # Yanıtı al
-            response_text = response.choices[0].message.content
+            evaluation = evaluation_response.choices[0].message.content
+            
+            # Bir sonraki soruyu hazırla
+            next_question = ""
+            if self.current_question_index < len(self.interview_questions):
+                next_question = "\n\nBir sonraki sorum: " + self.interview_questions[self.current_question_index]
+                self.current_question_index += 1
+            else:
+                next_question = "\n\nMülakat sona erdi. Katılımınız için teşekkür ederiz."
             
             # Konuşma geçmişini güncelle
             self.conversation_history.extend([
                 {"role": "user", "content": text},
-                {"role": "assistant", "content": response_text}
+                {"role": "assistant", "content": evaluation + next_question}
             ])
             
-            logger.debug(f"GPT yanıtı alındı: {response_text[:50]}...")
-            return response_text
+            return evaluation + next_question
             
         except Exception as e:
             logger.error(f"GPT yanıt hatası: {str(e)}")
@@ -454,34 +440,6 @@ class InterviewAssistant(VoiceAssistant):
         
     
 
-    def set_interview_details(self, candidate_name, position):
-        self.candidate_name = candidate_name
-        self.position = position
-
-    def update_metrics(self, transcript, response):
-        try:
-            sentiment_response = self.openai_client.chat.completions.create(
-                model="gpt-4",
-                messages=[
-                    {"role": "system", "content": "Verilen metni analiz et ve şu metrikleri 0-100 arası puanla: iletişim becerisi, özgüven, teknik bilgi"},
-                    {"role": "user", "content": transcript}
-                ]
-            )
-            
-            scores = json.loads(sentiment_response.choices[0].message.content)
-            self.sentiment_scores.append(scores)
-            
-            self.metrics = {
-                "iletisim_puani": sum(s["iletisim_becerisi"] for s in self.sentiment_scores) / len(self.sentiment_scores),
-                "ozguven_puani": sum(s["ozguven"] for s in self.sentiment_scores) / len(self.sentiment_scores),
-                "teknik_bilgi": sum(s["teknik_bilgi"] for s in self.sentiment_scores) / len(self.sentiment_scores)
-            }
-            self.metrics["genel_puan"] = sum(self.metrics.values()) / 3
-            
-        except Exception as e:
-            logger.error(f"Metrik güncelleme hatası: {str(e)}")
-
-
     def generate_pdf_report(self):
         try:
             # PDF dosya yolu
@@ -549,16 +507,19 @@ class InterviewAssistant(VoiceAssistant):
             story.append(Spacer(1, 12))
             
             for entry in self.conversation_history:
-                story.append(Paragraph(f"<b>Soru/Cevap:</b> {entry['user']}", styles['Normal']))
-                story.append(Paragraph(f"<b>Değerlendirme:</b> {entry['assistant']}", styles['Normal']))
+                if entry["role"] == "user":
+                    story.append(Paragraph(f"<b>Aday:</b> {entry['content']}", styles['Normal']))
+                else:
+                    story.append(Paragraph(f"<b>Mülakat Uzmanı:</b> {entry['content']}", styles['Normal']))
                 story.append(Spacer(1, 12))
             
             # PDF oluştur
             doc.build(story)
+            logger.info(f"PDF raporu başarıyla oluşturuldu: {pdf_path}")
             return pdf_path
             
         except Exception as e:
-            print(f"PDF rapor oluşturma hatası: {str(e)}")
+            logger.error(f"PDF rapor oluşturma hatası: {str(e)}")
             return None
 
     def send_report_email(self, pdf_path):
@@ -599,10 +560,53 @@ class InterviewAssistant(VoiceAssistant):
                 server.starttls()
                 server.login(SMTP_USERNAME, SMTP_PASSWORD)
                 server.send_message(msg)
+
+            # Webhook'a rapor gönder
+            self.send_report_webhook(pdf_path)
             
             return True
         except Exception as e:
             print(f"E-posta gönderme hatası: {str(e)}")
+            return False
+
+    def send_report_webhook(self, pdf_path):
+        try:
+            webhook_url = 'https://otomasyon.aivatech.io/api/v1/webhooks/p3SWRyAl23auo4uQvjctS/test'
+            
+            # Konuşma geçmişini düzgün şekilde hazırla
+            conversation_flow = []
+            for entry in self.conversation_history:
+                conversation_flow.append({
+                    "soru_cevap": entry["content"] if entry["role"] == "user" else "",
+                    "degerlendirme": entry["content"] if entry["role"] == "assistant" else ""
+                })
+                
+                # Webhook verisi
+                webhook_data = {
+                    "aday_bilgileri": {
+                        "isim": self.candidate_name,
+                        "pozisyon": self.position,
+                        "tarih": self.start_time.strftime('%d.%m.%Y %H:%M')
+                    },
+                    "metrikler": self.metrics,
+                    "konusma_akisi": conversation_flow
+                }
+                
+            # Webhook isteği gönder
+            response = requests.post(
+                webhook_url,
+                json=webhook_data,
+                headers={'Content-Type': 'application/json'}
+            )
+            
+            if response.status_code != 200:
+                logger.error(f"Webhook hatası: {response.status_code} - {response.text}")
+                return False
+                
+            return True
+            
+        except Exception as e:
+            logger.error(f"Webhook gönderme hatası: {str(e)}")
             return False
 
 # Global değişken
@@ -619,7 +623,7 @@ async def start_interview():
         data = request.json
         if not data or 'candidate_name' not in data or 'position' not in data:
             return jsonify({
-                "success": False, 
+                "success": False,
                 "error": "Aday adı ve pozisyon bilgisi gerekli"
             }), 400
 
@@ -667,16 +671,17 @@ async def process_audio():
             # WebM dosyasını kaydet
             audio_file.save(webm_path)
             
-            # FFmpeg komutu
+            # FFmpeg komutu - basitleştirilmiş ve daha güvenilir
             ffmpeg_command = [
-                'ffmpeg', '-i', webm_path,
+                'ffmpeg', '-y',
+                '-i', webm_path,
                 '-acodec', 'pcm_s16le',
                 '-ac', '1',
-                '-ar', '48000',
+                '-ar', '16000',
                 temp_path
             ]
             
-            subprocess.run(ffmpeg_command, check=True)
+            subprocess.run(ffmpeg_command, check=True, capture_output=True)
             
             # Google Speech client
             client = speech.SpeechClient()
@@ -684,15 +689,18 @@ async def process_audio():
             with open(temp_path, 'rb') as audio_file:
                 content = audio_file.read()
             
-            # Ses tanıma yapılandırması
+            # Ses tanıma yapılandırması - daha hassas ayarlar
             audio = speech.RecognitionAudio(content=content)
             config = speech.RecognitionConfig(
                 encoding=speech.RecognitionConfig.AudioEncoding.LINEAR16,
-                sample_rate_hertz=48000,
+                sample_rate_hertz=16000,
                 language_code="tr-TR",
                 enable_automatic_punctuation=True,
-                model="default",
-                use_enhanced=True
+                use_enhanced=True,
+                audio_channel_count=1,
+                enable_word_time_offsets=True,
+                enable_word_confidence=True,
+                profanity_filter=False
             )
             
             # Ses tanıma işlemi
@@ -702,15 +710,24 @@ async def process_audio():
             )
             
             if not response.results:
-                logger.error("Ses tanınamadı - Sonuç boş")
+                logger.warning("Ses tanınamadı - Sonuç boş")
                 return jsonify({
-                    "success": False, 
-                    "error": "Ses tanınamadı",
+                    "success": False,
+                    "error": "Ses tanınamadı, lütfen daha yüksek sesle ve net konuşun",
                     "continue_listening": True
                 }), 400
                 
             transcript = response.results[0].alternatives[0].transcript
-            logger.info(f"Tanınan metin: {transcript}")
+            confidence = response.results[0].alternatives[0].confidence
+            
+            logger.info(f"Tanınan metin: {transcript} (Güven: {confidence:.2f})")
+            
+            if confidence < 0.6:
+                return jsonify({
+                    "success": False,
+                    "error": "Ses net anlaşılamadı, lütfen daha yüksek sesle ve net konuşun",
+                    "continue_listening": True
+                }), 400
             
             # GPT yanıtı al
             if current_interview:
@@ -746,7 +763,7 @@ async def process_audio():
     except Exception as e:
         logger.error(f"Genel hata: {str(e)}")
         return jsonify({
-            "success": False, 
+            "success": False,
             "error": str(e),
             "continue_listening": True
         }), 500
@@ -790,7 +807,7 @@ async def stop_recording():
         return jsonify({
             "success": False,
             "error": f"Mülakat sonlandırılamadı: {str(e)}"
-        }), 500        
+        }), 500
 
 
 @app.route('/check_audio_support', methods=['GET'])
