@@ -346,7 +346,7 @@ Tarayıcıda `http://localhost:5004` adresine gidin
 
 ## License 📄
 
-MIT License - See LICENSE file for details
+
 
 ---
 
