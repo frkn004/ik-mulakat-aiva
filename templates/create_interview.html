@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AIVA - Mülakat Oluştur</title>
+    <link href="https://unpkg.com/tailwindcss@^2/dist/tailwind.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background: linear-gradient(135deg, #f8fafc 0%, #eef2ff 100%);
+            min-height: 100vh;
+        }
+        .glassmorphism {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        }
+    </style>
+</head>
+<body class="p-6">
+    <div class="max-w-2xl mx-auto">
+        <!-- Header -->
+        <div class="glassmorphism rounded-2xl p-6 mb-8">
+            <div class="text-center">
+                <h1 class="text-3xl font-bold text-gray-800">AIVA Mülakat Oluştur</h1>
+                <p class="text-gray-600 mt-1">Yeni bir mülakat oluşturmak için aşağıdaki bilgileri doldurun</p>
+            </div>
+        </div>
+
+        <!-- Mülakat Oluşturma Formu -->
+        <div class="glassmorphism rounded-2xl p-8">
+            <div class="space-y-6">
+                <div>
+                    <label for="candidateName" class="block text-sm font-medium text-gray-700 mb-2">
+                        Aday Adı
+                    </label>
+                    <input type="text" 
+                           id="candidateName" 
+                           class="w-full px-4 py-3 rounded-xl border-2 border-gray-200 
+                                  focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 
+                                  text-gray-700"
+                           placeholder="Adı Soyadı">
+                </div>
+
+                <div>
+                    <label for="position" class="block text-sm font-medium text-gray-700 mb-2">
+                        Pozisyon
+                    </label>
+                    <input type="text" 
+                           id="position" 
+                           class="w-full px-4 py-3 rounded-xl border-2 border-gray-200 
+                                  focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 
+                                  text-gray-700"
+                           placeholder="Örn: Python Geliştirici">
+                </div>
+
+                <button onclick="createInterview()" 
+                        class="w-full bg-gradient-to-r from-indigo-600 to-purple-600 
+                               hover:from-indigo-700 hover:to-purple-700 text-white 
+                               font-medium text-lg py-4 px-6 rounded-xl shadow-lg 
+                               hover:shadow-xl transition-all duration-300 
+                               flex items-center justify-center space-x-3">
+                    <i class="fas fa-plus-circle text-2xl"></i>
+                    <span>Mülakat Oluştur</span>
+                </button>
+
+                <div class="text-center">
+                    <a href="/join" class="text-indigo-600 hover:text-indigo-800">
+                        <i class="fas fa-link mr-2"></i>
+                        Mülakata Katıl
+                    </a>
+                </div>
+            </div>
+
+            <!-- Sonuç Kutusu -->
+            <div id="resultBox" class="mt-8 p-6 rounded-xl border-2 border-gray-200 hidden">
+                <h3 class="text-lg font-semibold text-gray-800 mb-4">Mülakat Oluşturuldu</h3>
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-600 mb-2">
+                            Mülakat Kodu
+                        </label>
+                        <div class="flex items-center space-x-2">
+                            <input type="text" 
+                                   id="interviewCode" 
+                                   class="flex-1 px-4 py-3 rounded-xl border-2 border-gray-200 
+                                          bg-gray-50 text-gray-700 font-mono text-lg uppercase" 
+                                   readonly>
+                            <button onclick="copyToClipboard('interviewCode')" 
+                                    class="p-3 text-indigo-600 hover:text-indigo-800 
+                                           rounded-xl hover:bg-indigo-50 transition-colors">
+                                <i class="fas fa-copy text-xl"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-600 mb-2">
+                            Mülakat Linki
+                        </label>
+                        <div class="flex items-center space-x-2">
+                            <input type="text" 
+                                   id="interviewLink" 
+                                   class="flex-1 px-4 py-3 rounded-xl border-2 border-gray-200 
+                                          bg-gray-50 text-gray-700" 
+                                   readonly>
+                            <button onclick="copyToClipboard('interviewLink')" 
+                                    class="p-3 text-indigo-600 hover:text-indigo-800 
+                                           rounded-xl hover:bg-indigo-50 transition-colors">
+                                <i class="fas fa-copy text-xl"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Sorular -->
+                    <div>
+                        <label class="block text-sm font-medium text-gray-600 mb-2">
+                            Mülakat Soruları
+                        </label>
+                        <div id="questionsList" class="space-y-2">
+                            <!-- Sorular JavaScript ile eklenecek -->
+                        </div>
+                    </div>
+
+                    <!-- Başlat Butonu -->
+                    <div class="text-center mt-4">
+                        <button onclick="startInterview()" 
+                                class="px-6 py-3 bg-green-600 text-white rounded-xl hover:bg-green-700 transition-colors">
+                            <i class="fas fa-play mr-2"></i>
+                            Mülakatı Başlat
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Hata Mesajı -->
+            <div id="errorBox" class="mt-4 p-4 rounded-lg bg-red-100 text-red-700 hidden"></div>
+        </div>
+    </div>
+
+    <script>
+        let interviewQuestions = [];
+
+        async function createInterview() {
+            const candidateName = document.getElementById('candidateName').value.trim();
+            const position = document.getElementById('position').value.trim();
+
+            if (!candidateName || !position) {
+                showError('Lütfen tüm alanları doldurun');
+                return;
+            }
+
+            try {
+                const response = await fetch('/create_interview', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        candidate_name: candidateName,
+                        position: position
+                    })
+                });
+
+                const data = await response.json();
+                if (data.success) {
+                    showResult(data.code, data.questions);
+                } else {
+                    showError(data.error || 'Mülakat oluşturulurken bir hata oluştu');
+                }
+            } catch (error) {
+                showError('Bir hata oluştu');
+            }
+        }
+
+        function showResult(code, questions) {
+            const resultBox = document.getElementById('resultBox');
+            const errorBox = document.getElementById('errorBox');
+            const interviewCode = document.getElementById('interviewCode');
+            const interviewLink = document.getElementById('interviewLink');
+            const questionsList = document.getElementById('questionsList');
+
+            errorBox.classList.add('hidden');
+            resultBox.classList.remove('hidden');
+
+            interviewCode.value = code;
+            interviewLink.value = `${window.location.origin}/interview?code=${code}`;
+
+            // Soruları göster
+            interviewQuestions = questions || [];
+            questionsList.innerHTML = '';
+            interviewQuestions.forEach((question, index) => {
+                const questionDiv = document.createElement('div');
+                questionDiv.className = 'flex items-center space-x-2';
+                questionDiv.innerHTML = `
+                    <input type="text" 
+                           value="${question}"
+                           class="flex-1 px-4 py-3 rounded-xl border-2 border-gray-200 text-gray-700">
+                    <button onclick="editQuestion(${index})" 
+                            class="p-3 text-indigo-600 hover:text-indigo-800 rounded-xl hover:bg-indigo-50">
+                        <i class="fas fa-edit"></i>
+                    </button>
+                `;
+                questionsList.appendChild(questionDiv);
+            });
+        }
+
+        function editQuestion(index) {
+            const questionInput = document.querySelector(`#questionsList div:nth-child(${index + 1}) input`);
+            const newQuestion = prompt('Soruyu düzenleyin:', questionInput.value);
+            
+            if (newQuestion && newQuestion !== questionInput.value) {
+                questionInput.value = newQuestion;
+                interviewQuestions[index] = newQuestion;
+            }
+        }
+
+        async function startInterview() {
+            const code = document.getElementById('interviewCode').value;
+            
+            try {
+                const response = await fetch('/start_interview', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        code: code,
+                        questions: interviewQuestions
+                    })
+                });
+
+                const data = await response.json();
+                if (data.success) {
+                    window.location.href = `/interview?code=${code}`;
+                } else {
+                    showError(data.error || 'Mülakat başlatılamadı');
+                }
+            } catch (error) {
+                showError('Mülakat başlatılırken bir hata oluştu');
+            }
+        }
+
+        function showError(message) {
+            const errorBox = document.getElementById('errorBox');
+            errorBox.textContent = message;
+            errorBox.classList.remove('hidden');
+            document.getElementById('resultBox').classList.add('hidden');
+        }
+
+        async function copyToClipboard(elementId) {
+            const element = document.getElementById(elementId);
+            try {
+                await navigator.clipboard.writeText(element.value);
+                const button = element.nextElementSibling;
+                const icon = button.querySelector('i');
+                
+                // Geçici olarak ikonu değiştir
+                const originalClass = icon.className;
+                icon.className = 'fas fa-check text-xl';
+                button.classList.add('text-green-600');
+                
+                setTimeout(() => {
+                    icon.className = originalClass;
+                    button.classList.remove('text-green-600');
+                }, 2000);
+            } catch (err) {
+                console.error('Kopyalama başarısız:', err);
+            }
+        }
+
+        // Enter tuşu ile form gönderme
+        document.querySelectorAll('input').forEach(input => {
+            input.addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    createInterview();
+                }
+            });
+        });
+    </script>
+</body>
+</html> 

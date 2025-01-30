@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AIVA - Mülakata Katıl</title>
+    <link href="https://unpkg.com/tailwindcss@^2/dist/tailwind.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background: linear-gradient(135deg, #f8fafc 0%, #eef2ff 100%);
+            min-height: 100vh;
+        }
+        .glassmorphism {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        }
+    </style>
+</head>
+<body class="p-6">
+    <div class="max-w-2xl mx-auto">
+        <!-- Header -->
+        <div class="glassmorphism rounded-2xl p-6 mb-8">
+            <div class="text-center">
+                <h1 class="text-3xl font-bold text-gray-800">AIVA Mülakata Katıl</h1>
+                <p class="text-gray-600 mt-1">Mülakat kodunuzu girerek başlayın</p>
+            </div>
+        </div>
+
+        <!-- Kod Giriş Formu -->
+        <div class="glassmorphism rounded-2xl p-8">
+            <div class="space-y-6">
+                <div>
+                    <label for="interviewCode" class="block text-sm font-medium text-gray-700 mb-2">
+                        Mülakat Kodu
+                    </label>
+                    <input type="text" 
+                           id="interviewCode" 
+                           class="w-full px-4 py-3 rounded-xl border-2 border-gray-200 
+                                  focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 
+                                  text-gray-700 text-lg font-mono uppercase"
+                           placeholder="XXXX-XXXX"
+                           maxlength="8">
+                </div>
+
+                <button onclick="verifyAndJoin()" 
+                        class="w-full bg-gradient-to-r from-indigo-600 to-purple-600 
+                               hover:from-indigo-700 hover:to-purple-700 text-white 
+                               font-medium text-lg py-4 px-6 rounded-xl shadow-lg 
+                               hover:shadow-xl transition-all duration-300 
+                               flex items-center justify-center space-x-3">
+                    <i class="fas fa-sign-in-alt text-2xl"></i>
+                    <span>Mülakata Başla</span>
+                </button>
+
+                <div class="text-center">
+                    <a href="/" class="text-indigo-600 hover:text-indigo-800">
+                        <i class="fas fa-arrow-left mr-2"></i>
+                        Mülakat Oluştur
+                    </a>
+                </div>
+            </div>
+
+            <!-- Hata/Başarı Mesajı -->
+            <div id="messageBox" class="mt-4 p-4 rounded-lg hidden">
+                <!-- Mesaj içeriği JavaScript ile eklenecek -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        async function verifyAndJoin() {
+            const code = document.getElementById('interviewCode').value.trim();
+            if (!code) {
+                showMessage('Lütfen mülakat kodunu girin', 'error');
+                return;
+            }
+
+            try {
+                const response = await fetch('/verify_code', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ code: code })
+                });
+
+                const data = await response.json();
+                if (data.success) {
+                    window.location.href = `/interview?code=${code}`;
+                } else {
+                    showMessage(data.error || 'Geçersiz kod', 'error');
+                }
+            } catch (error) {
+                showMessage('Bir hata oluştu', 'error');
+            }
+        }
+
+        function showMessage(message, type) {
+            const messageBox = document.getElementById('messageBox');
+            messageBox.className = `mt-4 p-4 rounded-lg ${type === 'error' ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`;
+            messageBox.innerHTML = message;
+            messageBox.classList.remove('hidden');
+        }
+
+        // Enter tuşu ile giriş yapma
+        document.getElementById('interviewCode').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                verifyAndJoin();
+            }
+        });
+    </script>
+</body>
+</html> 
