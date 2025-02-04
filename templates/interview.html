@@ -7,6 +7,7 @@
     <link href="https://unpkg.com/tailwindcss@^2/dist/tailwind.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <style>
         body {
             font-family: 'Plus Jakarta Sans', sans-serif;
@@ -95,10 +96,14 @@
                 <div>
                     <h1 class="text-2xl font-bold text-gray-800">{{ interview.candidate_name }}</h1>
                     <p class="text-gray-600">{{ interview.position }}</p>
+                    <p class="text-sm text-gray-500 mt-1">Mülakat Kodu: {{ interview.code }}</p>
                 </div>
-                <div id="audioStatus" class="text-sm font-medium text-gray-600">
-                    <i class="fas fa-circle text-green-500 mr-2"></i>
-                    <span>Hazır</span>
+                <div class="text-right">
+                    <div id="audioStatus" class="text-sm font-medium text-gray-600">
+                        <i class="fas fa-circle text-green-500 mr-2"></i>
+                        <span>Hazır</span>
+                    </div>
+                    <p class="text-xs text-gray-500 mt-1">{{ interview.created_at }}</p>
                 </div>
             </div>
         </div>
@@ -108,7 +113,8 @@
             <div id="messages" class="chat-messages p-6 space-y-4">
                 <!-- Hoşgeldin mesajı -->
                 <div class="message ai rounded-xl p-4 text-white">
-                    <p>Merhaba {{ interview.candidate_name }}, {{ interview.position }} pozisyonu için mülakatımıza hoş geldiniz. Nasılsınız?</p>
+                    <p>Merhaba {{ interview.candidate_name }}, {{ interview.position }} pozisyonu için mülakatımıza hoş geldiniz.</p>
+                    <p class="mt-2">İlk sorum: {{ interview.questions[0] }}</p>
                 </div>
             </div>
 
@@ -150,6 +156,9 @@
         let silenceDuration = 1000;
         let silenceStart = null;
         let autoRecording = true;
+        let audioChunks = [];
+        let silenceTimeout;
+        let volumeCheckInterval;
 
         // Sayfa yüklendiğinde
         document.addEventListener('DOMContentLoaded', async () => {
@@ -273,54 +282,84 @@
         }
 
         // Kayıt başlat
-        function startRecording() {
-            if (isRecording || isProcessing) return;
-
+        async function startRecording() {
             try {
-                const options = {
-                    mimeType: 'audio/webm'
-                };
-
-                mediaRecorder = new MediaRecorder(audioStream, options);
-                mediaRecorder.ondataavailable = handleDataAvailable;
-                mediaRecorder.onstop = handleRecordingStop;
-
-                mediaRecorder.start();
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                mediaRecorder = new MediaRecorder(stream);
+                audioChunks = [];
                 isRecording = true;
-                updateStatus('Kayıt yapılıyor...', 'red', true);
-                checkAudioLevel();
-
+                
+                mediaRecorder.ondataavailable = (event) => {
+                    audioChunks.push(event.data);
+                };
+                
+                mediaRecorder.onstop = async () => {
+                    const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                    await sendAudioToServer(audioBlob);
+                };
+                
+                mediaRecorder.start();
+                document.getElementById('toggleRecording').disabled = true;
+                document.getElementById('toggleRecording').innerHTML = '<i class="fas fa-stop-circle"></i><span>Kaydı Durdur</span>';
+                document.getElementById('toggleRecording').classList.add('bg-red-600', 'hover:bg-red-700');
+                
+                // Ses seviyesi kontrolü
+                const audioContext = new AudioContext();
+                const analyser = audioContext.createAnalyser();
+                const microphone = audioContext.createMediaStreamSource(stream);
+                microphone.connect(analyser);
+                
+                analyser.fftSize = 256;
+                const bufferLength = analyser.frequencyBinCount;
+                const dataArray = new Uint8Array(bufferLength);
+                
+                // Ses seviyesi kontrolü için interval
+                volumeCheckInterval = setInterval(() => {
+                    analyser.getByteFrequencyData(dataArray);
+                    const average = dataArray.reduce((a, b) => a + b) / bufferLength;
+                    const volume = average / 128.0; // 0-1 arası normalize edilmiş değer
+                    
+                    // Ses seviyesi göstergesini güncelle
+                    const volumeBar = document.getElementById('volumeBar');
+                    volumeBar.style.width = `${volume * 100}%`;
+                    
+                    // Sessizlik kontrolü
+                    if (volume < 0.1) { // Sessizlik eşiği
+                        if (!silenceTimeout) {
+                            silenceTimeout = setTimeout(() => {
+                                if (mediaRecorder.state === 'recording') {
+                                    mediaRecorder.stop();
+                                }
+                            }, 1500); // 1.5 saniye sessizlik sonrası durdur
+                        }
+                    } else {
+                        if (silenceTimeout) {
+                            clearTimeout(silenceTimeout);
+                            silenceTimeout = null;
+                        }
+                    }
+                }, 100);
+                
             } catch (error) {
-                console.error('Kayıt başlatma hatası:', error);
-                showError('Kayıt başlatılamadı');
+                console.error('Mikrofon erişim hatası:', error);
             }
         }
 
         // Kayıt durdur
         function stopRecording() {
-            if (!isRecording) return;
-
-            try {
+            isRecording = false;
+            if (mediaRecorder && mediaRecorder.state === 'recording') {
                 mediaRecorder.stop();
-                isRecording = false;
-                updateStatus('İşleniyor...', 'yellow');
-            } catch (error) {
-                console.error('Kayıt durdurma hatası:', error);
-                showError('Kayıt durdurulamadı');
             }
-        }
-
-        // Kayıt verisi geldiğinde
-        function handleDataAvailable(event) {
-            if (event.data.size > 0) {
-                processAudio(event.data);
+            if (volumeCheckInterval) {
+                clearInterval(volumeCheckInterval);
             }
-        }
-
-        // Kayıt durduğunda
-        async function handleRecordingStop() {
-            if (isProcessing) return;
-            isProcessing = true;
+            if (silenceTimeout) {
+                clearTimeout(silenceTimeout);
+            }
+            document.getElementById('toggleRecording').disabled = false;
+            document.getElementById('toggleRecording').innerHTML = '<i class="fas fa-microphone"></i><span>Kayda Başla</span>';
+            document.getElementById('toggleRecording').classList.remove('bg-red-600', 'hover:bg-red-700');
             updateStatus('İşleniyor...', 'yellow');
         }
 
@@ -471,6 +510,53 @@
                 }, 1000);
             } finally {
                 isProcessing = false;
+            }
+        }
+
+        async function sendAudioToServer(audioBlob) {
+            try {
+                const formData = new FormData();
+                formData.append('audio', audioBlob);
+                
+                const response = await fetch('/process_audio', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    // Konuşma geçmişini güncelle
+                    const conversation = document.getElementById('messages');
+                    if (result.transcript) {
+                        conversation.innerHTML += `<div class="message user rounded-xl p-4 text-white ml-auto">${result.transcript}</div>`;
+                    }
+                    if (result.response) {
+                        conversation.innerHTML += `<div class="message ai rounded-xl p-4 text-white">${result.response}</div>`;
+                        await speakText(result.response);
+                    }
+                    conversation.scrollTop = conversation.scrollHeight;
+                    
+                    // Mülakat tamamlandıysa
+                    if (result.interview_completed) {
+                        stopRecording();
+                        alert('Mülakat tamamlandı!');
+                    } else if (result.should_restart) {
+                        // Yeni kayıt başlat
+                        startRecording();
+                    }
+                } else {
+                    console.error('Ses işleme hatası:', result.error);
+                    if (result.should_restart) {
+                        // Hata durumunda da yeni kayıt başlat
+                        startRecording();
+                    }
+                }
+                
+            } catch (error) {
+                console.error('Sunucu iletişim hatası:', error);
+                // Hata durumunda da yeni kayıt başlat
+                startRecording();
             }
         }
     </script>

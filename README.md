@@ -1,183 +1,242 @@
-# AIVA Interview Assistant 🎙️
+# AIVA Interview Assistant | Mülakat Asistanı 🎙️
 
-![AIVA Logo](https://www.aivatech.io/wp-content/uploads/2023/09/AIVA-App-Logo1-1200-x-300piksel-1-1-1024x256.png)
+<div align="center">
+  <img src="https://www.aivatech.io/wp-content/uploads/2023/09/AIVA-App-Logo1-1200-x-300piksel-1-1-1024x256.png" alt="AIVA Logo" width="400"/>
+  
+  <p>
+    <a href="#features-">English</a> |
+    <a href="#özellikler-">Türkçe</a>
+  </p>
+</div>
+
+---
+
+# English
 
 ## Features 🚀
 
-- **Real-time Speech Recognition**: Transcribes Turkish interview conversations
-- **AI-Powered Interview Management**: GPT-3.5 integration for intelligent interview flow
-- **Performance Analytics**: Real-time evaluation of communication skills, confidence, and technical knowledge
-- **Automated PDF Reports**: Comprehensive interview documentation
-- **Email Integration**: Automatic report distribution
-- **Voice Synthesis**: Natural speech responses via Google Cloud TTS
-- **Dual Recording Modes**: 
-  - Auto Mode: Voice-activity detection
-  - Manual Mode: Space-bar control
-- **User-friendly Interface**: Modern web interface with real-time feedback
+### Real-time Speech Recognition
+- High-accuracy Turkish speech-to-text conversion
+- Noise filtering and echo cancellation
+- Automatic silence detection
+- Multi-format audio support (WebM, WAV, MP3)
+
+### AI-Powered Interview Management
+- GPT-3.5 based dynamic question generation
+- Position-specific technical evaluation
+- Real-time response analysis
+- Adaptive interview flow
+
+### Performance Analytics
+- Communication skills assessment
+- Confidence level analysis
+- Technical knowledge evaluation
+- Real-time metrics visualization
+- Comprehensive scoring system
+
+### Professional Reporting
+- Automated PDF report generation
+- Interview transcripts
+- Performance graphs and metrics
+- Evaluation summaries
+- Email distribution system
+
+### Multiple Interfaces
+- Interview creation dashboard
+- Interview entry portal
+- Real-time interview interface
+- Audio level visualization
+- User-friendly controls
+
+### Recording Modes
+- **Auto Mode**: 
+  - Voice activity detection
+  - Automatic silence handling
+  - Continuous recording
+- **Manual Mode**:
+  - Space-bar controlled recording
+  - Precise timing control
+  - Visual feedback
 
 ## Technical Requirements 📋
 
+### Core Requirements
 - Python 3.8+
 - FFmpeg
-- Google Cloud account with APIs enabled
+- SQLite3
+- Modern web browser with microphone support
+
+### API Requirements
+- Google Cloud Account
+  - Speech-to-Text API enabled
+  - Text-to-Speech API enabled
 - OpenAI API key
 - SMTP server access
 
-## Installation Guide 🔧
+### System Requirements
+- 2GB RAM minimum
+- 1GB free disk space
+- Microphone
+- Internet connection (2 Mbps+)
 
-### 1. Basic Setup
-
-```bash
-# Clone repository
-git clone https://github.com/yourusername/mulakat-aiva.git
-cd mulakat-aiva
-
-# Create virtual environment
-python -m venv .venv
-
-# Activate virtual environment
-# Windows:
-.venv\Scripts\activate
-# Linux/Mac:
-source .venv/bin/activate
-
-# Install dependencies
-pip install -r requirements.txt
-```
-
-### 2. Google Cloud Setup 🔑
-
-1. Create a Google Cloud Project:
-   - Go to [Google Cloud Console](https://console.cloud.google.com)
-   - Create a new project or select existing
-   - Enable required APIs:
-     - Speech-to-Text API
-     - Text-to-Speech API
-
-2. Create Service Account:
-   - Navigate to "IAM & Admin" > "Service Accounts"
-   - Click "Create Service Account"
-   - Name: "aiva-interview-assistant"
-   - Grant roles:
-     - Speech-to-Text Admin
-     - Text-to-Speech Admin
-
-3. Generate Credentials:
-   - Select your service account
-   - Go to "Keys" tab
-   - "Add Key" > "Create New Key"
-   - Choose JSON format
-   - Save as `google_credentials.json` in project root
-
-### 3. Environment Configuration
-
-Create `.env` file in project root:
-
-```env
-# OpenAI Configuration
-OPENAI_API_KEY=your_openai_api_key
-
-# Email Configuration
-SMTP_SERVER=smtp.gmail.com
-SMTP_PORT=587
-SMTP_USERNAME=your_email@gmail.com
-SMTP_PASSWORD=your_app_specific_password
-REPORT_SENDER=sender@yourdomain.com
-REPORT_RECIPIENT=recipient@yourdomain.com
-
-# Google Cloud
-GOOGLE_APPLICATION_CREDENTIALS=./google_credentials.json
-```
-
-## Running the Application 🚀
-
-```bash
-python app.py
-```
-
-Access the interface at: `http://localhost:5004`
-
-## Directory Structure 📁
+## Project Structure 📁
 
 ```
 mulakat-aiva/
-├── .env                    # Environment variables
-├── .gitignore             # Git ignore rules
 ├── app.py                 # Main application
-├── requirements.txt       # Dependencies
+├── utils.py              # Helper functions
+├── requirements.txt      # Dependencies
+├── .env                  # Environment variables
 ├── google_credentials.json # Google Cloud credentials
-├── reports/              # Generated PDF reports
-├── temp/                 # Temporary audio files
-└── templates/            # HTML templates
-    └── index.html        # Main interface
+├── data/                 # Database and data files
+│   └── interview.db      # SQLite database
+├── reports/             # Generated PDF reports
+├── temp/                # Temporary audio files
+├── interview_questions/ # Interview questions
+├── interviews/         # Interview records
+└── templates/          # HTML templates
+    ├── index.html          # Main page
+    ├── create_interview.html # Interview creation
+    ├── interview_entry.html # Interview entry
+    └── interview.html      # Interview interface
 ```
 
-## Key Dependencies 📚
+## Installation 🔧
 
-```text
-flask==3.0.2
-flask-cors==4.0.0
-openai==1.12.0
-google-cloud-speech==2.21.0
-google-cloud-texttospeech==2.14.1
-sounddevice==0.4.6
-soundfile==0.13.0
-reportlab==4.2.0
-python-dotenv==1.0.1
-ffmpeg-python==0.2.0
+### 1. Clone Repository
+```bash
+git clone https://github.com/yourusername/mulakat-aiva.git
+cd mulakat-aiva
+```
+
+### 2. Set Up Virtual Environment
+```bash
+python -m venv .venv
+source .venv/bin/activate  # Linux/Mac
+# or
+.venv\Scripts\activate     # Windows
+```
+
+### 3. Install Dependencies
+```bash
+pip install -r requirements.txt
+```
+
+### 4. Configure Environment
+Create `.env` file:
+```env
+# OpenAI
+OPENAI_API_KEY=your_api_key
+
+# Email
+SMTP_SERVER=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USERNAME=your_email
+SMTP_PASSWORD=your_password
+REPORT_SENDER=sender@domain.com
+REPORT_RECIPIENT=recipient@domain.com
+
+# Google Cloud
+GOOGLE_APPLICATION_CREDENTIALS=./google_credentials.json
+
+# Webhook
+WEBHOOK_URL=your_webhook_url
+```
+
+### 5. Create Required Directories
+```bash
+mkdir -p reports temp interview_questions interviews data
 ```
 
 ## Usage Guide 💡
 
-1. Start Application:
-   - Run server
-   - Open web interface
-   - Enter candidate details
+### 1. Starting the Application
+```bash
+python app.py
+```
+Access at: `http://localhost:5004`
 
-2. Recording Modes:
-   - Auto Mode: Automatically detects speech
-   - Manual Mode: Hold space bar to record
+### 2. Creating an Interview
+1. Navigate to "Create Interview"
+2. Enter candidate details
+3. Select position
+4. System generates interview code
+5. Share code with candidate
 
-3. Interview Flow:
-   - System transcribes speech
-   - AI generates responses
-   - Real-time analytics update
-   - PDF report generated automatically
+### 3. Joining an Interview
+1. Go to "Join Interview"
+2. Enter interview code
+3. Grant microphone permissions
+4. Select recording mode
+5. Begin interview
 
-4. Post-Interview:
-   - Review performance metrics
-   - Access PDF report
-   - Check email for documentation
+### 4. During Interview
+- Answer questions clearly
+- Monitor audio levels
+- Watch real-time feedback
+- Check performance metrics
+
+### 5. Post Interview
+- Review generated report
+- Check email for documentation
+- Analyze performance metrics
+- Access interview recording
+
+## Security 🔒
+
+### API Security
+- Secure credential storage
+- Regular key rotation
+- Rate limiting
+- Request validation
+
+### Data Protection
+- SSL/TLS encryption
+- Secure file handling
+- Database encryption
+- Session management
+
+### Best Practices
+- Use app-specific passwords
+- Regular security updates
+- Access control
+- Audit logging
 
 ## Troubleshooting 🔧
 
-Common issues and solutions:
+### Microphone Issues
+- Check browser permissions
+- Verify audio settings
+- Try different browsers
+- Test microphone input
 
-1. **Microphone Access**: Enable browser permissions
-2. **Speech Recognition**: Check Google credentials
-3. **Email Sending**: Verify SMTP settings
-4. **Audio Quality**: Use external microphone if needed
+### Speech Recognition
+- Check internet connection
+- Verify Google Cloud credentials
+- Monitor audio quality
+- Update FFmpeg
 
-## Security Notes 🔒
-
-- Store credentials securely
-- Use app-specific passwords for email
-- Regular API key rotation
-- Keep dependencies updated
+### Email Problems
+- Verify SMTP settings
+- Check spam folder
+- Review firewall settings
+- Test email credentials
 
 ## Contributing 🤝
 
 1. Fork repository
-2. Create feature branch
-3. Commit changes
-4. Push to branch
-5. Submit pull request
+2. Create feature branch (`git checkout -b feature/newFeature`)
+3. Commit changes (`git commit -am 'Add new feature'`)
+4. Push branch (`git push origin feature/newFeature`)
+5. Create Pull Request
+
+## License 📄
+
+This project is licensed under the [MIT License](LICENSE).
 
 ---
 
-# AIVA Mülakat Asistanı 🎙️ [Türkçe]
-
-Yapay zeka teknolojileri ile güçlendirilmiş, gerçek zamanlı ses tanıma özellikli profesyonel mülakat asistanı.
+# Türkçe
 
 ## Özellikler 🚀
 
@@ -203,151 +262,155 @@ Yapay zeka teknolojileri ile güçlendirilmiş, gerçek zamanlı ses tanıma öz
   - Performans grafikleri
   - Değerlendirme özeti
 
+- **Çoklu Arayüz**:
+  - Mülakat oluşturma paneli
+  - Mülakat giriş ekranı 
+  - Gerçek zamanlı mülakat arayüzü
+  - Ses seviyesi göstergesi
+
 ## Teknik Gereksinimler 📋
 
-- Python 3.8 veya üzeri
-- FFmpeg kurulumu
-- Google Cloud hesabı
+- Python 3.8+
+- FFmpeg
+- Google Cloud hesabı (Speech-to-Text ve Text-to-Speech API'leri etkin)
 - OpenAI API anahtarı
 - SMTP sunucu erişimi
 
-## Kurulum Kılavuzu 🔧
+## Proje Yapısı 📁
 
-### 1. Temel Kurulum
+```
+mulakat-aiva/
+├── app.py                 # Ana uygulama
+├── utils.py              # Yardımcı fonksiyonlar
+├── requirements.txt      # Bağımlılıklar
+├── .env                  # Ortam değişkenleri
+├── google_credentials.json # Google Cloud kimlik bilgileri
+├── data/                 # Veritabanı ve veri dosyaları
+├── reports/             # Oluşturulan PDF raporlar
+├── temp/                # Geçici ses dosyaları
+├── interview_questions/ # Mülakat soruları
+├── interviews/         # Mülakat kayıtları
+└── templates/          # HTML şablonları
+    ├── index.html          # Ana sayfa
+    ├── create_interview.html # Mülakat oluşturma
+    ├── interview_entry.html # Mülakat giriş
+    └── interview.html      # Mülakat arayüzü
+```
 
+## Kurulum 🔧
+
+1. Depoyu klonlayın:
 ```bash
-# Depoyu klonlayın
-git clone https://github.com/kullaniciadi/mulakat-aiva.git
+git clone https://github.com/yourusername/mulakat-aiva.git
 cd mulakat-aiva
+```
 
-# Sanal ortam oluşturun
+2. Sanal ortam oluşturun:
+```bash
 python -m venv .venv
+source .venv/bin/activate  # Linux/Mac
+# veya
+.venv\Scripts\activate     # Windows
+```
 
-# Sanal ortamı etkinleştirin
-# Windows için:
-.venv\Scripts\activate
-# Linux/Mac için:
-source .venv/bin/activate
-
-# Bağımlılıkları yükleyin
+3. Bağımlılıkları yükleyin:
+```bash
 pip install -r requirements.txt
 ```
 
-### 2. Google Cloud Yapılandırması 🔑
-
-1. Google Cloud Projesi Oluşturma:
-   - [Google Cloud Console](https://console.cloud.google.com)'a gidin
-   - Yeni proje oluşturun
-   - Gerekli API'leri etkinleştirin:
-     - Speech-to-Text API
-     - Text-to-Speech API
-
-2. Servis Hesabı Oluşturma:
-   - "IAM ve Yönetim" > "Servis Hesapları"na gidin
-   - "Servis Hesabı Oluştur"a tıklayın
-   - İsim: "aiva-mulakat-asistani"
-   - Rolleri atayın:
-     - Speech-to-Text Yönetici
-     - Text-to-Speech Yönetici
-
-3. Kimlik Bilgilerini Oluşturma:
-   - Servis hesabınızı seçin
-   - "Anahtarlar" sekmesine gidin
-   - "Anahtar Ekle" > "Yeni Anahtar Oluştur"
-   - JSON formatını seçin
-   - `google_credentials.json` olarak kaydedin
-
-### 3. Ortam Yapılandırması
-
-Proje ana dizininde `.env` dosyası oluşturun:
-
+4. `.env` dosyasını oluşturun:
 ```env
-# OpenAI Yapılandırması
-OPENAI_API_KEY=openai_api_anahtariniz
+# OpenAI
+OPENAI_API_KEY=your_api_key
 
-# E-posta Yapılandırması
+# Email
 SMTP_SERVER=smtp.gmail.com
 SMTP_PORT=587
-SMTP_USERNAME=eposta@gmail.com
-SMTP_PASSWORD=uygulama_sifresi
-REPORT_SENDER=gonderici@domain.com
-REPORT_RECIPIENT=alici@domain.com
+SMTP_USERNAME=your_email
+SMTP_PASSWORD=your_password
+REPORT_SENDER=sender@domain.com
+REPORT_RECIPIENT=recipient@domain.com
 
 # Google Cloud
 GOOGLE_APPLICATION_CREDENTIALS=./google_credentials.json
+
+# Webhook
+WEBHOOK_URL=your_webhook_url
 ```
 
-## Kullanım Kılavuzu 💡
+5. Gerekli dizinleri oluşturun:
+```bash
+mkdir -p reports temp interview_questions interviews data
+```
 
-### 1. Uygulamayı Başlatma:
+## Kullanım 💡
+
+1. Uygulamayı başlatın:
 ```bash
 python app.py
 ```
-Tarayıcıda `http://localhost:5004` adresine gidin
 
-### 2. Kayıt Modları:
-- **Otomatik Mod**: 
-  - Ses aktivitesini otomatik algılar
-  - Sessizlikte otomatik durur
-  
-- **Manuel Mod**: 
-  - Boşluk tuşu ile kontrol
-  - Daha hassas kayıt kontrolü
+2. Tarayıcıda `http://localhost:5004` adresine gidin
 
-### 3. Mülakat Akışı:
-1. Aday bilgilerini girin
-2. Pozisyon seçin
-3. Kayıt modunu belirleyin
-4. Mülakatı başlatın
-5. Gerçek zamanlı geri bildirimleri takip edin
+3. Mülakat Oluşturma:
+   - "Mülakat Oluştur" sayfasından yeni mülakat oluşturun
+   - Aday bilgilerini ve pozisyonu girin
+   - Sistem otomatik mülakat kodu oluşturur
 
-### 4. Raporlama:
-- PDF rapor otomatik oluşturulur
-- E-posta ile ilgililere iletilir
-- Performans metrikleri görselleştirilir
+4. Mülakata Katılma:
+   - "Mülakata Katıl" sayfasından mülakat kodunu girin
+   - Mikrofon izinlerini verin
+   - Otomatik veya manuel kayıt modunu seçin
 
-## Sorun Giderme 🔧
+5. Mülakat Süreci:
+   - Ses kaydı başlatın
+   - Sistem soruları sorar ve yanıtları değerlendirir
+   - Gerçek zamanlı geri bildirim alın
+   - Mülakat sonunda otomatik rapor oluşturulur
 
-1. **Mikrofon Sorunları**:
-   - Tarayıcı izinlerini kontrol edin
-   - Mikrofon bağlantısını test edin
-   - Ses seviyesini kontrol edin
-
-2. **Ses Tanıma Sorunları**:
-   - Google kimlik bilgilerini kontrol edin
-   - İnternet bağlantısını test edin
-   - FFmpeg kurulumunu doğrulayın
-
-3. **E-posta Sorunları**:
-   - SMTP ayarlarını kontrol edin
-   - Güvenlik duvarı ayarlarını gözden geçirin
-   - E-posta kimlik bilgilerini doğrulayın
-
-## Güvenlik Notları 🔒
+## Güvenlik 🔒
 
 - API anahtarlarını güvenli saklayın
 - E-posta için uygulama şifresi kullanın
-- Düzenli kimlik bilgisi rotasyonu yapın
-- Bağımlılıkları güncel tutun
+- Düzenli güvenlik güncellemeleri yapın
+- SSL/TLS kullanın
 
-## Destek ve Katkı 🤝
+## Sorun Giderme 🔧
 
-- Hata raporları için Issues bölümünü kullanın
-- Geliştirmeler için Pull Request gönderin
-- Destek için topluluk forumlarını ziyaret edin
+1. Mikrofon Sorunları:
+   - Tarayıcı izinlerini kontrol edin
+   - Ses ayarlarını kontrol edin
+   - Farklı tarayıcı deneyin
 
-## Katkıda Bulunma
+2. Ses Tanıma:
+   - İnternet bağlantısını kontrol edin
+   - Google Cloud kimlik bilgilerini doğrulayın
+   - Ses kalitesini kontrol edin
+
+3. E-posta:
+   - SMTP ayarlarını kontrol edin
+   - Spam klasörünü kontrol edin
+   - Güvenlik duvarı ayarlarını kontrol edin
+
+## Katkıda Bulunma 🤝
 
 1. Depoyu fork edin
-2. Feature branch oluşturun
-3. Değişikliklerinizi commit edin
-4. Branch'inize push yapın
+2. Feature branch oluşturun (`git checkout -b feature/yeniOzellik`)
+3. Değişikliklerinizi commit edin (`git commit -am 'Yeni özellik eklendi'`)
+4. Branch'inizi push edin (`git push origin feature/yeniOzellik`)
 5. Pull Request oluşturun
 
-## License 📄
+## Lisans 📄
 
-
+Bu proje [MIT lisansı](LICENSE) altında lisanslanmıştır.
 
 ---
 
-Developed by AIVA Tech - Making interviews smarter 🤖
+<div align="center">
+  <p>Developed with ❤️ by AIVA Tech</p>
+  <p>
+    <a href="https://www.aivatech.io">Website</a> |
+    <a href="https://github.com/aivatech">GitHub</a> |
+    <a href="https://www.linkedin.com/company/aivatech">LinkedIn</a>
+  </p>
+</div>
