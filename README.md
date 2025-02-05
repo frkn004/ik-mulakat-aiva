@@ -230,9 +230,6 @@ Access at: `http://localhost:5004`
 4. Push branch (`git push origin feature/newFeature`)
 5. Create Pull Request
 
-## License 📄
-
-This project is licensed under the [MIT License](LICENSE).
 
 ---
 
@@ -400,9 +397,6 @@ python app.py
 4. Branch'inizi push edin (`git push origin feature/yeniOzellik`)
 5. Pull Request oluşturun
 
-## Lisans 📄
-
-Bu proje [MIT lisansı](LICENSE) altında lisanslanmıştır.
 
 ---
 
