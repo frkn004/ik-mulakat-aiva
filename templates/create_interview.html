@@ -10,7 +10,7 @@
     <style>
         body {
             font-family: 'Plus Jakarta Sans', sans-serif;
-            background: linear-gradient(135deg, #f8fafc 0%, #eef2ff 100%);
+            background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
             min-height: 100vh;
         }
         .glassmorphism {
@@ -19,14 +19,38 @@
             border: 1px solid rgba(255, 255, 255, 0.2);
             box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
         }
+        .aiva-logo {
+            width: 180px;
+            transition: transform 0.3s ease;
+        }
+        .aiva-logo:hover {
+            transform: scale(1.05);
+        }
+        .yellow-gradient-btn {
+            background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
+        }
+        .yellow-gradient-btn:hover {
+            background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+        }
+        .input-field {
+            transition: all 0.3s ease;
+            border: 2px solid #fde68a;
+        }
+        .input-field:focus {
+            border-color: #f59e0b;
+            box-shadow: 0 0 0 3px rgba(251, 191, 36, 0.2);
+        }
     </style>
 </head>
 <body class="p-6">
     <div class="max-w-2xl mx-auto">
-        <!-- Header -->
+        <!-- Header with AIVA Logo -->
         <div class="glassmorphism rounded-2xl p-6 mb-8">
             <div class="text-center">
-                <h1 class="text-3xl font-bold text-gray-800">AIVA Mülakat Oluştur</h1>
+                <img src="https://www.aivatech.io/wp-content/uploads/2023/09/AIVA-App-Logo1-1200-x-300piksel-1-1-1024x256.png" 
+                     alt="AIVA Logo" 
+                     class="aiva-logo mx-auto mb-4">
+                <h1 class="text-3xl font-bold text-gray-800">Mülakat Oluştur</h1>
                 <p class="text-gray-600 mt-1">Yeni bir mülakat oluşturmak için aşağıdaki bilgileri doldurun</p>
             </div>
         </div>
@@ -40,8 +64,7 @@
                     </label>
                     <input type="text" 
                            id="candidateName" 
-                           class="w-full px-4 py-3 rounded-xl border-2 border-gray-200 
-                                  focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 
+                           class="w-full px-4 py-3 rounded-xl input-field
                                   text-gray-700"
                            placeholder="Adı Soyadı">
                 </div>
@@ -52,15 +75,13 @@
                     </label>
                     <input type="text" 
                            id="position" 
-                           class="w-full px-4 py-3 rounded-xl border-2 border-gray-200 
-                                  focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 
+                           class="w-full px-4 py-3 rounded-xl input-field
                                   text-gray-700"
                            placeholder="Örn: Python Geliştirici">
                 </div>
 
                 <button onclick="createInterview()" 
-                        class="w-full bg-gradient-to-r from-indigo-600 to-purple-600 
-                               hover:from-indigo-700 hover:to-purple-700 text-white 
+                        class="w-full yellow-gradient-btn text-white 
                                font-medium text-lg py-4 px-6 rounded-xl shadow-lg 
                                hover:shadow-xl transition-all duration-300 
                                flex items-center justify-center space-x-3">
@@ -69,7 +90,7 @@
                 </button>
 
                 <div class="text-center">
-                    <a href="/join" class="text-indigo-600 hover:text-indigo-800">
+                    <a href="/join" class="text-yellow-600 hover:text-yellow-800 transition-colors">
                         <i class="fas fa-link mr-2"></i>
                         Mülakata Katıl
                     </a>
@@ -77,7 +98,7 @@
             </div>
 
             <!-- Sonuç Kutusu -->
-            <div id="resultBox" class="mt-8 p-6 rounded-xl border-2 border-gray-200 hidden">
+            <div id="resultBox" class="mt-8 p-6 rounded-xl border-2 border-yellow-200 hidden">
                 <h3 class="text-lg font-semibold text-gray-800 mb-4">Mülakat Oluşturuldu</h3>
                 <div class="space-y-4">
                     <div>
@@ -87,12 +108,12 @@
                         <div class="flex items-center space-x-2">
                             <input type="text" 
                                    id="interviewCode" 
-                                   class="flex-1 px-4 py-3 rounded-xl border-2 border-gray-200 
+                                   class="flex-1 px-4 py-3 rounded-xl input-field
                                           bg-gray-50 text-gray-700 font-mono text-lg uppercase" 
                                    readonly>
                             <button onclick="copyToClipboard('interviewCode')" 
-                                    class="p-3 text-indigo-600 hover:text-indigo-800 
-                                           rounded-xl hover:bg-indigo-50 transition-colors">
+                                    class="p-3 text-yellow-600 hover:text-yellow-800 
+                                           rounded-xl hover:bg-yellow-50 transition-colors">
                                 <i class="fas fa-copy text-xl"></i>
                             </button>
                         </div>
@@ -104,31 +125,22 @@
                         <div class="flex items-center space-x-2">
                             <input type="text" 
                                    id="interviewLink" 
-                                   class="flex-1 px-4 py-3 rounded-xl border-2 border-gray-200 
+                                   class="flex-1 px-4 py-3 rounded-xl input-field
                                           bg-gray-50 text-gray-700" 
                                    readonly>
                             <button onclick="copyToClipboard('interviewLink')" 
-                                    class="p-3 text-indigo-600 hover:text-indigo-800 
-                                           rounded-xl hover:bg-indigo-50 transition-colors">
+                                    class="p-3 text-yellow-600 hover:text-yellow-800 
+                                           rounded-xl hover:bg-yellow-50 transition-colors">
                                 <i class="fas fa-copy text-xl"></i>
                             </button>
                         </div>
                     </div>
 
-                    <!-- Sorular -->
-                    <div>
-                        <label class="block text-sm font-medium text-gray-600 mb-2">
-                            Mülakat Soruları
-                        </label>
-                        <div id="questionsList" class="space-y-2">
-                            <!-- Sorular JavaScript ile eklenecek -->
-                        </div>
-                    </div>
-
                     <!-- Başlat Butonu -->
-                    <div class="text-center mt-4">
+                    <div class="text-center mt-6">
                         <button onclick="startInterview()" 
-                                class="px-6 py-3 bg-green-600 text-white rounded-xl hover:bg-green-700 transition-colors">
+                                class="yellow-gradient-btn text-white px-8 py-3 rounded-xl 
+                                       hover:shadow-xl transition-all duration-300">
                             <i class="fas fa-play mr-2"></i>
                             Mülakatı Başlat
                         </button>
@@ -200,7 +212,7 @@
                            value="${question}"
                            class="flex-1 px-4 py-3 rounded-xl border-2 border-gray-200 text-gray-700">
                     <button onclick="editQuestion(${index})" 
-                            class="p-3 text-indigo-600 hover:text-indigo-800 rounded-xl hover:bg-indigo-50">
+                            class="p-3 text-yellow-600 hover:text-yellow-800 rounded-xl hover:bg-yellow-50">
                         <i class="fas fa-edit"></i>
                     </button>
                 `;
