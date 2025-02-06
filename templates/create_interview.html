@@ -212,7 +212,26 @@
             resultBox.classList.remove('hidden');
 
             interviewCode.value = data.code;
-            interviewLink.value = data.url;
+            interviewLink.value = data.urls.main;
+
+            // URL'leri göstermek için yeni bir bölüm ekle
+            const urlsContainer = document.createElement('div');
+            urlsContainer.className = 'mt-4 space-y-2';
+            urlsContainer.innerHTML = `
+                <div class="text-sm font-medium text-gray-700">Diğer URL'ler:</div>
+                <div class="flex items-center justify-between bg-gray-50 p-2 rounded">
+                    <span class="text-sm">Mülakat Oluşturma:</span>
+                    <a href="${data.urls.create}" class="text-yellow-600 hover:text-yellow-800" target="_blank">
+                        ${data.urls.create}
+                    </a>
+                </div>
+                <div class="flex items-center justify-between bg-gray-50 p-2 rounded">
+                    <span class="text-sm">Mülakata Katılım:</span>
+                    <a href="${data.urls.join}" class="text-yellow-600 hover:text-yellow-800" target="_blank">
+                        ${data.urls.join}
+                    </a>
+                </div>
+            `;
 
             // Soruları göster
             questionsList.innerHTML = '';

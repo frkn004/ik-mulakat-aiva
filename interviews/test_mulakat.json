@@ -1,0 +1,19 @@
+{
+  "adSoyad": "Mehmet Yılmaz",
+  "mail": "mehmet.yilmaz@example.com",
+  "isIlaniPozisyonu": "Frontend Geliştirici",
+  "isIlaniGereksinimleri": [
+    "React ve modern JavaScript framework'leri konusunda deneyim",
+    "HTML5, CSS3 ve responsive tasarım konularında uzmanlık",
+    "Git versiyon kontrol sistemi kullanım tecrübesi",
+    "UI/UX prensipleri hakkında bilgi sahibi olmak",
+    "Cross-browser uyumluluk konusunda deneyim"
+  ],
+  "mulakatSorulari": [
+    "React'te state management konusunda hangi yaklaşımları kullandınız?",
+    "Responsive tasarım yaparken dikkat ettiğiniz önemli noktalar nelerdir?",
+    "Modern JavaScript'in önemli özelliklerinden bahseder misiniz?",
+    "Web performans optimizasyonu için neler yaparsınız?",
+    "Git workflow'unuzdan ve branch stratejinizden bahseder misiniz?"
+  ]
+} 

@@ -731,12 +731,22 @@ def create_interview():
             logger.info(f"Yeni mülakat oluşturuldu: {interview_code}")
             
             # Mülakat linkini oluştur
-            interview_url = f"{request.host_url}interview?code={interview_code}"
+            domain = os.getenv('DOMAIN_NAME', request.host_url.rstrip('/'))
+            
+            # HTTPS kontrolü
+            protocol = 'https' if request.is_secure or 'https' in request.host_url else 'http'
+            
+            # Ana domain ve alt domainler için farklı URL'ler oluştur
+            interview_urls = {
+                'main': f"{protocol}://{domain}/interview?code={interview_code}",
+                'create': f"{protocol}://{domain}/",
+                'join': f"{protocol}://{domain}/join"
+            }
             
             return jsonify({
                 'success': True,
                 'code': interview_code,
-                'url': interview_url,
+                'urls': interview_urls,
                 'questions': custom_questions
             })
             
@@ -1580,6 +1590,7 @@ if __name__ == '__main__':
         if 'observer' in locals() and observer:
             observer.stop()
             observer.join()
+            
             
             
             
