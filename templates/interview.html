@@ -30,19 +30,20 @@
 
         .chat-container {
             width: 100%;
-            max-width: 1000px;
-            height: calc(100vh - 80px);
-            margin: 80px auto 0;
+            max-width: 1200px;
+            height: 100vh;
+            margin: 0 auto;
             position: relative;
             display: flex;
             flex-direction: column;
             align-items: center;
+            justify-content: center;
         }
 
         .aiva-logo {
             position: fixed;
-            top: 20px;
-            left: 20px;
+            bottom: 20px;
+            right: 20px;
             width: 180px;
             height: auto;
             z-index: 100;
@@ -55,37 +56,34 @@
         }
 
         .aiva-avatar {
-            width: 400px;  /* Daha büyük avatar */
+            width: 400px;
             height: 400px;
             border-radius: 50%;
             background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
             display: flex;
             align-items: center;
             justify-content: center;
-            margin: 2rem auto;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
             box-shadow: 0 20px 40px rgba(251, 191, 36, 0.4);
-            position: relative;
             z-index: 10;
-            cursor: pointer;
-            transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
             overflow: hidden;
+            transform-origin: center center;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
-        .aiva-avatar::before {
-            content: '';
-            position: absolute;
-            width: 150%;
-            height: 150%;
-            background: radial-gradient(circle, rgba(251, 191, 36, 0.2) 0%, transparent 70%);
-            animation: pulse-ring 3s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+        .aiva-avatar:hover {
+            transform: translate(-50%, -50%);
         }
 
-        .aiva-avatar::after {
-            content: '';
-            position: absolute;
-            inset: 0;
-            border-radius: 50%;
-            background: linear-gradient(45deg, rgba(255, 255, 255, 0.1) 0%, transparent 100%);
+        .aiva-avatar.speaking {
+            animation: gentle-pulse 1s ease-in-out infinite;
+        }
+
+        .aiva-avatar.listening {
+            animation: gentle-shrink 1s ease-in-out infinite;
         }
 
         .aiva-avatar i {
@@ -147,44 +145,61 @@
             background: #d97706;
         }
 
-        .aiva-avatar:hover {
-            transform: scale(1.05);
-        }
-
         .chat-messages {
+            position: absolute;
             width: 100%;
-            height: calc(100% - 400px);
-            overflow-y: auto;
-            padding: 2rem;
-            display: flex;
-            flex-direction: column;
-            gap: 1.5rem;
+            height: 100%;
+            pointer-events: none;
+            z-index: 5;
         }
 
         .chat-bubble {
-            max-width: 80%;
-            padding: 1.5rem 2rem;
-            border-radius: 1.5rem;
-            position: relative;
-            animation: slideIn 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
-            margin-bottom: 1.5rem;
-            line-height: 1.6;
+            position: fixed;
+            max-width: 300px;
+            padding: 1.5rem;
+            border-radius: 20px;
+            background: white;
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
+            pointer-events: auto;
+            opacity: 0;
+            transform: scale(0.8);
+            transition: all 0.5s ease-out;
+        }
+
+        .chat-bubble.active {
+            opacity: 1;
+            transform: scale(1);
+        }
+
+        .chat-bubble.fade-out {
+            opacity: 0;
+            transform: scale(0.8);
+            transition: all 0.3s ease-in;
         }
 
         .assistant-bubble {
+            left: 75%;  /* Sağa kaydır */
+            top: 30%;   /* Yukarı kaydır */
             background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
             border: 1px solid rgba(251, 191, 36, 0.2);
-            margin-right: auto;
-            border-bottom-left-radius: 0.5rem;
         }
 
         .user-bubble {
+            right: 75%;  /* Sola kaydır */
+            top: 60%;    /* Aşağı kaydır */
             background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
             color: white;
-            margin-left: auto;
-            border-bottom-right-radius: 0.5rem;
-            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+        }
+
+        @keyframes bubbleFloat {
+            from {
+                opacity: 0;
+                transform: scale(0.8) translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: scale(1) translateY(0);
+            }
         }
 
         .assistant-bubble::before {
@@ -211,70 +226,99 @@
             height: 1rem;
         }
 
-        @keyframes pulse {
-            0% { transform: scale(1); }
-            50% { transform: scale(1.05); }
-            100% { transform: scale(1); }
+        @keyframes gentle-pulse {
+            0% { transform: translate(-50%, -50%) scale(1); }
+            50% { transform: translate(-50%, -50%) scale(1.02); }
+            100% { transform: translate(-50%, -50%) scale(1); }
         }
 
-        @keyframes float {
-            0% { transform: translateY(0px) rotate(0deg); }
-            25% { transform: translateY(-15px) rotate(2deg); }
-            50% { transform: translateY(0px) rotate(0deg); }
-            75% { transform: translateY(15px) rotate(-2deg); }
-            100% { transform: translateY(0px) rotate(0deg); }
+        @keyframes gentle-shrink {
+            0% { transform: translate(-50%, -50%) scale(1); }
+            50% { transform: translate(-50%, -50%) scale(0.98); }
+            100% { transform: translate(-50%, -50%) scale(1); }
         }
 
-        @keyframes slideIn {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-
-        .pulse-ring {
+        .avatar-effect {
             position: absolute;
             width: 100%;
             height: 100%;
             border-radius: 50%;
-            animation: pulse-ring 2s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
-            border: 6px solid #4f46e5;
+            background: radial-gradient(circle at center, rgba(255,255,255,0.2) 0%, transparent 70%);
+            animation: rotate 8s linear infinite;
         }
 
-        @keyframes pulse-ring {
-            0% {
-                transform: scale(0.8);
-                opacity: 0.5;
-            }
-            50% {
-                transform: scale(1.2);
-                opacity: 0.2;
-            }
-            100% {
-                transform: scale(0.8);
-                opacity: 0.5;
-            }
+        .avatar-effect::before {
+            content: '';
+            position: absolute;
+            width: 150%;
+            height: 150%;
+            top: -25%;
+            left: -25%;
+            background: linear-gradient(45deg, transparent 45%, rgba(255,255,255,0.15) 50%, transparent 55%);
+            animation: wave 3s ease-in-out infinite;
         }
 
-        .speaking {
-            animation: 
-                float 6s ease-in-out infinite,
-                pulse 1s ease-in-out infinite;
+        .avatar-effect.speaking {
+            animation: rotate-fast 4s linear infinite;
+        }
+
+        .avatar-effect.listening {
+            animation: rotate-slow 12s linear infinite;
+        }
+
+        @keyframes rotate {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
+        @keyframes rotate-fast {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
+        @keyframes rotate-slow {
+            from { transform: rotate(360deg); }
+            to { transform: rotate(0deg); }
+        }
+
+        @keyframes wave {
+            0% { transform: translateX(-30%) rotate(0deg); }
+            50% { transform: translateX(0%) rotate(180deg); }
+            100% { transform: translateX(-30%) rotate(360deg); }
         }
 
         .status-indicator {
-            position: absolute;
-            bottom: -1rem;
-            left: 50%;
-            transform: translateX(-50%);
+            position: fixed;
+            bottom: 80px; /* Mod butonunun üstünde */
+            left: 20px; /* Mod butonu ile aynı hizada */
             background: white;
-            padding: 0.5rem 1rem;
+            padding: 0.8rem 1.5rem;
             border-radius: 1rem;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
             display: flex;
             align-items: center;
             gap: 0.5rem;
-            font-size: 0.875rem;
+            font-size: 1rem;
+            font-weight: 500;
             color: #4f46e5;
             transition: all 0.3s ease;
+            white-space: nowrap;
+            z-index: 11;
+        }
+
+        .status-indicator.speaking {
+            background: #10b981;
+            color: white;
+        }
+
+        .status-indicator.listening {
+            background: #ef4444;
+            color: white;
+        }
+
+        .status-indicator.idle {
+            background: #6b7280;
+            color: white;
         }
 
         .status-dot {
@@ -349,6 +393,68 @@
         .paused {
             opacity: 0.7;
         }
+
+        /* Mod butonunu ekle */
+        .mode-button {
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+            background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
+            color: white;
+            padding: 12px 24px;
+            border-radius: 25px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            z-index: 100;
+            box-shadow: 0 8px 16px rgba(251, 191, 36, 0.3);
+            font-size: 1.1rem;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .mode-button:hover {
+            background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+            transform: translateX(5px); /* Sağa doğru hareket */
+            box-shadow: 0 12px 20px rgba(251, 191, 36, 0.4);
+        }
+
+        .mode-button i {
+            font-size: 1.2rem;
+        }
+
+        /* Baloncuklar için farklı pozisyonlar */
+        .position-1 { 
+            top: 15%; 
+            left: 15%; 
+            transform: translate(-50%, -50%) rotate(-5deg);
+        }
+        .position-2 { 
+            top: 15%; 
+            right: 15%; 
+            transform: translate(50%, -50%) rotate(5deg);
+        }
+        .position-3 { 
+            bottom: 15%; 
+            left: 15%; 
+            transform: translate(-50%, 50%) rotate(5deg);
+        }
+        .position-4 { 
+            bottom: 15%; 
+            right: 15%; 
+            transform: translate(50%, 50%) rotate(-5deg);
+        }
+        .position-5 { 
+            top: 50%; 
+            left: 10%; 
+            transform: translateX(-50%) rotate(-3deg);
+        }
+        .position-6 { 
+            top: 50%; 
+            right: 10%; 
+            transform: translateX(50%) rotate(3deg);
+        }
     </style>
 </head>
 <body>
@@ -412,21 +518,25 @@
     <div class="chat-container">
         <!-- AIVA Avatar -->
         <div class="aiva-avatar" id="aivaAvatar">
-            <div class="pulse-ring"></div>
+            <div class="avatar-effect" id="avatarEffect"></div>
             <i class="fas fa-robot text-white text-7xl"></i>
-            <div class="status-indicator">
-                <div class="status-dot" id="statusDot"></div>
-                <span id="statusText">Dinlemeye hazır</span>
-                        </div>
-                    </div>
+        </div>
 
         <!-- Chat Messages -->
-        <div id="messages" class="chat-messages">
-            <div class="chat-bubble assistant-bubble">
-                <p>Merhaba {{ interview.candidate_name }}, {{ interview.position }} pozisyonu için mülakatımıza hoş geldiniz. Size nasıl yardımcı olabilirim?</p>
-            </div>
-        </div>
+        <div id="messages" class="chat-messages"></div>
     </div>
+
+    <!-- Durum Göstergesi -->
+    <div class="status-indicator">
+        <div class="status-dot" id="statusDot"></div>
+        <span id="statusText">Dinlemeye hazır</span>
+    </div>
+
+    <!-- Mod Butonu -->
+    <button class="mode-button" id="modeButton">
+        <i class="fas fa-microphone"></i>
+        <span>Otomatik Mod</span>
+    </button>
 
     <script>
         let mediaRecorder = null;
@@ -935,11 +1045,26 @@
 
         function addMessageToChat(role, message) {
             const chatContainer = document.getElementById('messages');
+            
+            // Önceki aktif baloncukları kaldır
+            const activeMessages = document.querySelectorAll('.chat-bubble.active');
+            activeMessages.forEach(msg => {
+                msg.classList.add('fade-out');
+                setTimeout(() => msg.remove(), 300);
+            });
+
+            // Yeni baloncuk oluştur
             const messageDiv = document.createElement('div');
-            messageDiv.className = `chat-bubble ${role}-bubble`;
+            const position = Math.floor(Math.random() * 6) + 1;
+            messageDiv.className = `chat-bubble ${role}-bubble position-${position}`;
             messageDiv.textContent = message;
+
             chatContainer.appendChild(messageDiv);
-            chatContainer.scrollTop = chatContainer.scrollHeight;
+            
+            // Animasyon için timeout
+            setTimeout(() => {
+                messageDiv.classList.add('active');
+            }, 50);
 
             if (role === 'assistant') {
                 const avatar = document.getElementById('aivaAvatar');
@@ -1098,37 +1223,131 @@
                 return;
             }
 
-            // Avatar tıklama - mod değiştirme
-            document.getElementById('aivaAvatar').addEventListener('click', () => {
+            // Başlangıç durumunu ayarla
+            updateAvatarState('idle');
+
+            // Mod butonu için event listener
+            document.getElementById('modeButton').addEventListener('click', () => {
                 if (!interviewEnded) {
                     isAutoMode = !isAutoMode;
+                    const modeButton = document.getElementById('modeButton');
                     if (isAutoMode) {
                         startVoiceDetection();
-                        updateStatus('Otomatik dinleme aktif', 'auto');
+                        updateAvatarState('listening');
+                        modeButton.innerHTML = '<i class="fas fa-microphone"></i> <span>Otomatik Mod</span>';
                     } else {
-                        updateStatus('Manuel mod aktif (Space tuşunu kullanın)', 'manual');
+                        updateAvatarState('idle');
+                        modeButton.innerHTML = '<i class="fas fa-hand"></i> <span>Manuel Mod</span>';
                     }
                 }
             });
-            
+
             // Space tuşu kontrolü
             document.addEventListener('keydown', (e) => {
-                if (e.code === 'Space' && !isAutoMode) {
+                if (e.code === 'Space' && !isAutoMode && !isGPTSpeaking) {
                     e.preventDefault();
-                    if (!isRecording) startRecording();
+                    if (!isRecording) {
+                        startRecording();
+                        updateAvatarState('listening');
+                    }
                 }
             });
-            
+
             document.addEventListener('keyup', (e) => {
                 if (e.code === 'Space' && !isAutoMode) {
                     e.preventDefault();
-                    if (isRecording) stopRecording();
+                    if (isRecording) {
+                        stopRecording();
+                        updateAvatarState('idle');
+                    }
                 }
             });
 
             // Sayfa yüklendiğinde modalı göster
             showModal();
         });
+
+        function updateAvatarState(state) {
+            const avatar = document.getElementById('aivaAvatar');
+            const effect = document.getElementById('avatarEffect');
+            const statusIndicator = document.querySelector('.status-indicator');
+            
+            // Tüm durumları temizle
+            avatar.classList.remove('speaking', 'listening', 'idle');
+            effect.classList.remove('speaking', 'listening', 'idle');
+            statusIndicator.classList.remove('speaking', 'listening', 'idle');
+            
+            // Yeni durumu ekle
+            avatar.classList.add(state);
+            effect.classList.add(state);
+            statusIndicator.classList.add(state);
+            
+            // Durum metnini güncelle
+            const statusText = document.getElementById('statusText');
+            switch(state) {
+                case 'speaking':
+                    statusText.textContent = 'GPT konuşuyor...';
+                    break;
+                case 'listening':
+                    statusText.textContent = isAutoMode ? 'Dinleniyor...' : 'Manuel mod aktif';
+                    break;
+                case 'idle':
+                    statusText.textContent = 'Dinlemeye hazır';
+                    break;
+            }
+        }
+
+        // Ses işleme fonksiyonlarını güncelle
+        async function processAudio(audioBlob) {
+            try {
+                updateAvatarState('idle');
+                const response = await sendAudioToServer(audioBlob);
+                if (response.success) {
+                    if (response.transcript) {
+                        addMessageToChat('user', response.transcript);
+                    }
+                    if (response.response) {
+                        updateAvatarState('speaking');
+                        addMessageToChat('assistant', response.response);
+                        await speakResponse(response.response);
+                        updateAvatarState(isAutoMode ? 'listening' : 'idle');
+                    }
+                }
+            } catch (error) {
+                console.error('Ses işleme hatası:', error);
+                updateAvatarState('idle');
+            }
+        }
+
+        // Ses seviyesi kontrolünü güncelle
+        function checkAudioLevel() {
+            if (!analyser || !isAutoMode || isGPTSpeaking) return;
+
+            const bufferLength = analyser.frequencyBinCount;
+            const dataArray = new Uint8Array(bufferLength);
+            analyser.getByteFrequencyData(dataArray);
+            const average = dataArray.reduce((a, b) => a + b) / bufferLength;
+            const volume = average / 128.0;
+
+            if (volume > VOICE_THRESHOLD && !isRecording) {
+                startRecording();
+                updateAvatarState('listening');
+            } else if (volume < SILENCE_THRESHOLD && isRecording) {
+                if (!silenceStart) {
+                    silenceStart = Date.now();
+                } else if (Date.now() - silenceStart > SILENCE_DURATION) {
+                    stopRecording();
+                    updateAvatarState('idle');
+                    silenceStart = null;
+                }
+            } else if (volume >= SILENCE_THRESHOLD) {
+                silenceStart = null;
+            }
+
+            if (isAutoMode && !isGPTSpeaking) {
+                requestAnimationFrame(checkAudioLevel);
+            }
+        }
     </script>
 </body>
 </html> 
