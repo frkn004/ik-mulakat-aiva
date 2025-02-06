@@ -1,1226 +1,1183 @@
-<!DOCTYPE html>
-<html lang="tr">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AIVA Mülakat Asistanı</title>
-    <link href="https://unpkg.com/tailwindcss@^2/dist/tailwind.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <style>
-        /* Ana Tema Renkleri */
-        :root {
-            --primary: #fbbf24;
-            --primary-light: #fde68a;
-            --primary-dark: #f59e0b;
-            --background: #fffbeb;
-            --text: #1f2937;
-        }
+import sounddevice as sd
+from openai import OpenAI
+import numpy as np
+import soundfile as sf
+import os
+import subprocess
+from dotenv import load_dotenv
+import time
+from queue import Queue
+import asyncio
+import concurrent.futures
+from google.cloud import speech, texttospeech
+import logging
+from flask import Flask, request, jsonify, render_template, redirect
+from flask_cors import CORS
+from datetime import datetime, timedelta
+import json
+import smtplib
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+from email.mime.application import MIMEApplication
+from reportlab.lib import colors
+from reportlab.lib.pagesizes import A4
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from asgiref.wsgi import WsgiToAsgi
+import requests
+import speech_recognition as sr
+from concurrent.futures import ThreadPoolExecutor
+import threading
+from utils import create_interview, get_interview_by_code, update_interview_status
+import random
+import string
+import hashlib
+import sqlite3
+from watchdog.observers import Observer
+from watchdog.events import FileSystemEventHandler
+import secrets
 
-        body {
-            font-family: 'Plus Jakarta Sans', sans-serif;
-            background: linear-gradient(135deg, var(--background) 0%, #fff7e6 100%);
-            min-height: 100vh;
-            display: flex;
-            flex-direction: column;
-            margin: 0;
-            padding: 0;
-        }
+# Flask ve async ayarları
+app = Flask(__name__)
+CORS(app)
+loop = asyncio.new_event_loop()
+asyncio.set_event_loop(loop)
 
-        .header {
-            background: rgba(255, 255, 255, 0.95);
-            backdrop-filter: blur(10px);
-            border-bottom: 1px solid rgba(0, 0, 0, 0.1);
-            padding: 1rem;
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            z-index: 50;
-        }
+# Logger ayarları
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
-        .chat-container {
-            width: 100%;
-            max-width: 1000px;
-            height: calc(100vh - 80px);
-            margin: 80px auto 0;
-            position: relative;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-        }
+load_dotenv()
 
-        /* Logo Yeni Pozisyon */
-        .aiva-logo {
-            position: fixed;
-            bottom: 20px;
-            right: 20px;
-            width: 150px;
-            height: auto;
-            z-index: 100;
-            filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.1));
-            transition: transform 0.3s ease;
-        }
+# OpenAI istemcisini başlat
+openai_client = OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
 
-        .aiva-logo:hover {
-            transform: scale(1.05);
-        }
+# Doğru yol
+os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = os.path.join(os.path.dirname(__file__), 'google_credentials.json')
 
-        /* Modern Avatar */
-        .aiva-avatar {
-            width: 450px;
-            height: 450px;
-            border-radius: 50%;
-            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            margin: 4rem auto;
-            box-shadow: 
-                0 20px 40px rgba(251, 191, 36, 0.3),
-                inset 0 -10px 20px rgba(0, 0, 0, 0.1);
-            position: relative;
-            cursor: pointer;
-            transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
-            overflow: hidden;
-        }
+# Gerekli dizinleri oluştur
+required_dirs = ['reports', 'temp', 'interview_questions', 'interviews']
+for dir_name in required_dirs:
+    os.makedirs(dir_name, exist_ok=True)
 
-        .aiva-avatar::before {
-            content: '';
-            position: absolute;
-            width: 200%;
-            height: 200%;
-            background: radial-gradient(circle, rgba(255, 255, 255, 0.2) 0%, transparent 60%);
-            animation: rotateGradient 8s linear infinite;
-        }
+# E-posta ayarları
+SMTP_SERVER = os.getenv('SMTP_SERVER', 'smtp.gmail.com')
+SMTP_PORT = int(os.getenv('SMTP_PORT', 587))
+SMTP_USERNAME = os.getenv('SMTP_USERNAME')
+SMTP_PASSWORD = os.getenv('SMTP_PASSWORD')
+REPORT_SENDER = os.getenv('REPORT_SENDER')
+REPORT_RECIPIENT = os.getenv('REPORT_RECIPIENT')
 
-        @keyframes rotateGradient {
-            0% { transform: translate(-50%, -50%) rotate(0deg); }
-            100% { transform: translate(-50%, -50%) rotate(360deg); }
-        }
+# Webhook URL'sini güncelle
+WEBHOOK_URL = "https://otomasyon.aivatech.io/api/v1/webhooks/B7iYtwVltWEzX2nvAaWCX"
 
-        /* Dinleme Animasyonu */
-        .listening-animation {
-            position: absolute;
-            width: 100%;
-            height: 100%;
-            border-radius: 50%;
-            pointer-events: none;
-        }
+# Global değişkenler
+interview_data = {}  # Mülakat verilerini saklamak için
+SILENCE_THRESHOLD = 0.05  # Sessizlik eşik değeri
+VOICE_THRESHOLD = 0.15   # Ses algılama eşik değeri
+SILENCE_DURATION = 1500  # Sessizlik süresi (ms)
+MIN_CONFIDENCE = 0.6     # Minimum güven skoru
 
-        .listening-animation::before,
-        .listening-animation::after {
-            content: '';
-            position: absolute;
-            inset: -20px;
-            border: 3px solid var(--primary-light);
-            border-radius: 50%;
-            animation: pulseWave 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-            opacity: 0;
-        }
+class VoiceAssistant:
+    def __init__(self):
+        self.sample_rate = 16000
+        self.channels = 1
+        self.silence_threshold = 0.05
+        self.silence_duration = 0.5
+        self.audio_queue = Queue()
+        self.is_recording = False
+        self.executor = concurrent.futures.ThreadPoolExecutor(max_workers=4)
 
-        .listening-animation::after {
-            animation-delay: 1s;
-        }
+        # API ayarları
+        openai_api_key = os.getenv('OPENAI_API_KEY')
+        self.openai_client = OpenAI(api_key=openai_api_key)
 
-        @keyframes pulseWave {
-            0% { transform: scale(0.8); opacity: 0.8; }
-            100% { transform: scale(1.2); opacity: 0; }
-        }
+        try:
+            self.speech_client = speech.SpeechClient()
+            logger.info("Google Cloud Speech client başarıyla başlatıldı")
+        except Exception as e:
+            logger.error(f"Google Cloud Speech client başlatma hatası: {e}")
+            raise
 
-        /* Konuşma Animasyonu */
-        .speaking {
-            animation: speakingAnimation 4s ease-in-out infinite;
-        }
+        try:
+            self.tts_client = texttospeech.TextToSpeechClient()
+            logger.info("Google Cloud Text-to-Speech client başarıyla başlatıldı")
+        except Exception as e:
+            logger.error(f"Google Cloud Text-to-Speech client başlatma hatası: {e}")
+            raise
 
-        @keyframes speakingAnimation {
-            0% { transform: translate(0, 0) rotate(0deg); }
-            25% { transform: translate(10px, -15px) rotate(2deg); }
-            50% { transform: translate(-5px, 10px) rotate(-1deg); }
-            75% { transform: translate(-10px, -5px) rotate(1deg); }
-            100% { transform: translate(0, 0) rotate(0deg); }
-        }
+    def record_audio(self):
+        """Ses kaydı yap"""
+        logger.debug("Ses kaydı başlıyor...")
+        audio_chunks = []
+        silence_start = None
+        self.is_recording = True
 
-        /* Mod Göstergesi */
-        .mode-indicator {
-            position: absolute;
-            bottom: -60px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: white;
-            padding: 0.8rem 1.5rem;
-            border-radius: 1rem;
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
-            display: flex;
-            align-items: center;
-            gap: 0.8rem;
-            font-size: 1rem;
-            color: var(--text);
-            transition: all 0.3s ease;
-        }
+        with sd.InputStream(callback=self.audio_callback,
+                          channels=self.channels,
+                          samplerate=self.sample_rate):
+            while self.is_recording:
+                try:
+                    audio_chunk = self.audio_queue.get(timeout=0.3)
+                    audio_chunks.append(audio_chunk)
 
-        .mode-indicator .icon {
-            width: 12px;
-            height: 12px;
-            border-radius: 50%;
-            background: var(--primary);
-            transition: background-color 0.3s ease;
-        }
+                    if np.max(np.abs(audio_chunk)) < self.silence_threshold:
+                        if silence_start is None:
+                            silence_start = time.time()
+                        elif time.time() - silence_start > self.silence_duration:
+                            break
+                    else:
+                        silence_start = None
+                except:
+                    continue
 
-        .mode-indicator.listening .icon {
-            animation: blink 1s infinite;
-        }
+        logger.debug("Ses kaydı tamamlandı")
+        return np.concatenate(audio_chunks) if audio_chunks else None
 
-        /* Chat Baloncukları */
-        .chat-bubble {
-            max-width: 80%;
-            padding: 1.5rem 2rem;
-            border-radius: 1.5rem;
-            position: relative;
-            animation: slideIn 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
-            margin-bottom: 1.5rem;
-            line-height: 1.6;
-            background: white;
-            border: 1px solid rgba(251, 191, 36, 0.2);
-        }
+    def audio_callback(self, indata, frames, time, status):
+        if status:
+            logger.warning(f"Ses kaydı durum: {status}")
+        self.audio_queue.put(indata.copy())
 
-        .assistant-bubble {
-            margin-right: auto;
-            border-bottom-left-radius: 0.5rem;
-            background: linear-gradient(135deg, white 0%, #fffbeb 100%);
-        }
+    def save_audio(self, recording, filename='temp_recording.wav'):
+        logger.debug(f"Ses kaydı kaydediliyor: {filename}")
+        sf.write(filename, recording, self.sample_rate)
+        return filename
 
-        .user-bubble {
-            margin-left: auto;
-            border-bottom-right-radius: 0.5rem;
-            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
-            color: white;
-        }
+    async def transcribe_audio(self, audio_file):
+        try:
+            logger.debug("Ses tanıma başlıyor...")
+            
+            # Ses dosyasını dönüştür
+            data, _ = sf.read(audio_file)
+            converted_file = 'temp_converted.wav'
+            sf.write(converted_file, data, 48000)  # Sample rate'i 48000 olarak ayarla
+            
+            with open(converted_file, 'rb') as f:
+                content = f.read()
+                
+            audio = speech.RecognitionAudio(content=content)
+            config = speech.RecognitionConfig(
+                encoding=speech.RecognitionConfig.AudioEncoding.LINEAR16,
+                sample_rate_hertz=48000,  # Sample rate'i 48000 olarak ayarla
+                language_code="tr-TR",
+                enable_automatic_punctuation=True,
+                use_enhanced=True,
+                audio_channel_count=1
+            )
+            
+            response = await asyncio.get_event_loop().run_in_executor(
+                self.executor,
+                lambda: self.speech_client.recognize(config=config, audio=audio)
+            )
+            
+            if not response.results:
+                logger.warning("Ses tanıma sonuç vermedi")
+                return None
+                
+            transcript = response.results[0].alternatives[0].transcript
+            
+            # Geçici dosyayı temizle
+            if os.path.exists(converted_file):
+                os.remove(converted_file)
+                
+            return transcript.strip()
+            
+        except Exception as e:
+            logger.error(f"Ses tanıma hatası: {str(e)}")
+            return None
 
-        .assistant-bubble::before {
-            content: '';
-            position: absolute;
-            bottom: -0.5rem;
-            left: 1rem;
-            background: white;
-            border-right: 1px solid #e5e7eb;
-            border-bottom: 1px solid #e5e7eb;
-            clip-path: polygon(0 0, 0 100%, 100% 0);
-            width: 1rem;
-            height: 1rem;
-        }
+    async def generate_and_play_speech(self, text):
+        """Google TTS ile yanıtı seslendir"""
+        try:
+            logger.debug("Google TTS ile ses üretimi başlıyor...")
 
-        .user-bubble::before {
-            content: '';
-            position: absolute;
-            bottom: -0.5rem;
-            right: 1rem;
-            background: #4f46e5;
-            clip-path: polygon(0 0, 100% 100%, 100% 0);
-            width: 1rem;
-            height: 1rem;
-        }
+            synthesis_input = texttospeech.SynthesisInput(text=text)
+            voice = texttospeech.VoiceSelectionParams(
+                language_code="tr-TR",
+                name="tr-TR-Standard-A",
+                ssml_gender=texttospeech.SsmlVoiceGender.FEMALE
+            )
+            audio_config = texttospeech.AudioConfig(
+                audio_encoding=texttospeech.AudioEncoding.LINEAR16,
+                speaking_rate=1.0,
+                pitch=0,
+                volume_gain_db=0.0
+            )
 
-        @keyframes pulse {
-            0% { transform: scale(1); }
-            50% { transform: scale(1.05); }
-            100% { transform: scale(1); }
-        }
+            response = await asyncio.get_event_loop().run_in_executor(
+                self.executor,
+                lambda: self.tts_client.synthesize_speech(
+                    input=synthesis_input,
+                    voice=voice,
+                    audio_config=audio_config
+                )
+            )
 
-        @keyframes float {
-            0% { transform: translateY(0px) rotate(0deg); }
-            25% { transform: translateY(-15px) rotate(2deg); }
-            50% { transform: translateY(0px) rotate(0deg); }
-            75% { transform: translateY(15px) rotate(-2deg); }
-            100% { transform: translateY(0px) rotate(0deg); }
-        }
+            with open("temp_response.wav", "wb") as out:
+                out.write(response.audio_content)
 
-        @keyframes slideIn {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
+            data, fs = sf.read("temp_response.wav")
+            sd.play(data, fs)
+            sd.wait()
 
-        .pulse-ring {
-            position: absolute;
-            width: 100%;
-            height: 100%;
-            border-radius: 50%;
-            animation: pulse-ring 2s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
-            border: 6px solid #4f46e5;
-        }
+            os.remove("temp_response.wav")
 
-        @keyframes pulse-ring {
-            0% {
-                transform: scale(0.8);
-                opacity: 0.5;
+            logger.debug("Google TTS ses üretimi ve oynatma başarılı")
+        except Exception as e:
+            logger.error(f"Google TTS ses üretme hatası: {str(e)}")
+
+class InterviewAssistant(VoiceAssistant):
+    def __init__(self):
+        super().__init__()
+        self.candidate_name = ""
+        self.position = ""
+        self.requirements = []
+        self.custom_questions = []
+        self.conversation_history = []
+        self.sentiment_scores = []
+        self.metrics = {
+            "iletisim_puani": 0,
+            "ozguven_puani": 0,
+            "teknik_bilgi": 0,
+            "genel_puan": 0
+        }
+        self.start_time = datetime.now()
+        self.current_question_index = 0
+        self.interview_questions = []
+
+    def set_interview_details(self, code):
+        """Mülakat detaylarını ayarla"""
+        if code not in interview_data:
+            raise ValueError("Geçersiz mülakat kodu")
+
+        interview = interview_data[code]
+        self.candidate_name = interview["candidate_info"]["name"]
+        self.position = interview["candidate_info"]["position"]
+        self.requirements = interview["candidate_info"]["requirements"]
+        self.custom_questions = interview["candidate_info"]["custom_questions"]
+        
+        # Soruları hazırla
+        self._prepare_interview_questions()
+
+    def _prepare_interview_questions(self):
+        """Özelleştirilmiş mülakat sorularını hazırla"""
+        try:
+            # Özel soruları kullan
+            self.interview_questions = self.custom_questions
+
+            # Hoşgeldin mesajını ekle
+            welcome_message = f"Merhaba {self.candidate_name}, {self.position} pozisyonu için mülakatımıza hoş geldiniz."
+            self.conversation_history.append({
+                "role": "assistant",
+                "content": welcome_message
+            })
+
+            logger.info(f"Mülakat soruları hazırlandı: {len(self.interview_questions)} soru")
+
+        except Exception as e:
+            logger.error(f"Soru hazırlama hatası: {str(e)}")
+            # Varsayılan sorular
+            self.interview_questions = [
+                "Kendinizden ve kariyerinizden bahseder misiniz?",
+                "Bu pozisyona neden başvurdunuz?",
+                "Önceki iş deneyimlerinizden bahseder misiniz?",
+                "Teknik becerileriniz nelerdir?",
+                "Zorlu bir iş durumunu nasıl çözdüğünüzü anlatır mısınız?",
+                "Gelecekteki kariyer hedefleriniz nelerdir?"
+            ]
+            welcome_message = f"Merhaba {self.candidate_name}, {self.position} pozisyonu için mülakatımıza hoş geldiniz."
+            self.conversation_history.append({
+                "role": "assistant",
+                "content": welcome_message
+            })
+
+    async def get_gpt_response(self, text):
+        """Mülakat bağlamında GPT yanıtını al ve bir sonraki soruyu hazırla"""
+        try:
+            if not text:
+                logger.warning("Boş metin için GPT yanıtı istenemez")
+                return None
+                
+            # Konuşma geçmişini güncelle
+            self.conversation_history.append({"role": "user", "content": text})
+            
+            # Mülakat tamamlandı mı kontrol et
+            if self.current_question_index >= len(self.interview_questions):
+                # Mülakat bitti, son mesajı gönder
+                final_message = "Mülakat sona erdi. Katılımınız için teşekkür ederiz. Raporunuz hazırlanıyor..."
+                self.conversation_history.append({"role": "assistant", "content": final_message})
+                
+                # PDF raporu oluştur
+                pdf_path = self.generate_pdf_report()
+                if pdf_path:
+                    # Raporu e-posta ile gönder
+                    self.send_report_email(pdf_path)
+                    # Webhook'a gönder
+                    self.send_report_webhook(pdf_path)
+                    
+                return final_message
+            
+            # Bir sonraki soruyu hazırla
+            next_question = self.interview_questions[self.current_question_index]
+            self.current_question_index += 1
+            
+            # Yanıtı kaydet ve bir sonraki soruyu sor
+            response = next_question
+            self.conversation_history.append({"role": "assistant", "content": response})
+            
+            return response
+            
+        except Exception as e:
+            logger.error(f"GPT yanıt hatası: {str(e)}")
+            return None
+
+    async def _analyze_sentiment(self, text):
+        """Metni analiz et ve metrikleri güncelle"""
+        try:
+            sentiment_prompt = f"""
+            Lütfen aşağıdaki metni analiz et ve şu metrikleri 0-100 arası puanla:
+            Metin: "{text}"
+            
+            Şu formatta JSON yanıt ver:
+            {{
+                "iletisim_becerisi": [puan],
+                "ozguven": [puan],
+                "teknik_bilgi": [puan]
+            }}
+            """
+            
+            response = await asyncio.get_event_loop().run_in_executor(
+                self.executor,
+                lambda: self.openai_client.chat.completions.create(
+                    model="gpt-4",
+                    messages=[
+                        {"role": "system", "content": "Sen bir mülakat değerlendirme uzmanısın."},
+                        {"role": "user", "content": sentiment_prompt}
+                    ],
+                    temperature=0.3,
+                    max_tokens=150
+                )
+            )
+            
+            # JSON yanıtı parse et
+            analysis = json.loads(response.choices[0].message.content)
+            
+            # Metrikleri güncelle
+            self.sentiment_scores.append(analysis)
+            
+            # Ortalama puanları hesapla
+            self.metrics = {
+                "iletisim_puani": sum(s["iletisim_becerisi"] for s in self.sentiment_scores) / len(self.sentiment_scores),
+                "ozguven_puani": sum(s["ozguven"] for s in self.sentiment_scores) / len(self.sentiment_scores),
+                "teknik_bilgi": sum(s["teknik_bilgi"] for s in self.sentiment_scores) / len(self.sentiment_scores)
             }
-            50% {
-                transform: scale(1.2);
-                opacity: 0.2;
-            }
-            100% {
-                transform: scale(0.8);
-                opacity: 0.5;
-            }
-        }
+            self.metrics["genel_puan"] = sum(self.metrics.values()) / 3
+            
+            logger.debug(f"Metrikler güncellendi: {self.metrics}")
+            return None
+            
+        except Exception as e:
+            logger.error(f"Duygu analizi hatası: {str(e)}")
+            return None
 
-        .status-indicator {
-            position: absolute;
-            bottom: -1rem;
-            left: 50%;
-            transform: translateX(-50%);
-            background: white;
-            padding: 0.5rem 1rem;
-            border-radius: 1rem;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            font-size: 0.875rem;
-            color: #4f46e5;
-            transition: all 0.3s ease;
-        }
+    async def process_interview_response(self, text):
+        """Mülakat yanıtını işle ve değerlendir"""
+        try:
+            if not text:
+                return None
+                
+            # Bir sonraki soruyu hazırla
+            if self.current_question_index < len(self.interview_questions):
+                next_question = self.interview_questions[self.current_question_index]
+                self.current_question_index += 1
+            else:
+                next_question = "Mülakat sona erdi."
+            
+            # Konuşma geçmişini güncelle
+            self.conversation_history.extend([
+                {"role": "user", "content": text},
+                {"role": "assistant", "content": next_question}
+            ])
+            
+            return next_question
+            
+        except Exception as e:
+            logger.error(f"Yanıt işleme hatası: {str(e)}")
+            return None
 
-        .status-dot {
-            width: 8px;
-            height: 8px;
-            border-radius: 50%;
-            background: #6b7280;
-            transition: background-color 0.3s ease;
-        }
+    def generate_pdf_report(self):
+        try:
+            # PDF dosya yolu
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            pdf_path = os.path.join('reports', f"mulakat_raporu_{timestamp}.pdf")
+            
+            # PDF oluştur
+            doc = SimpleDocTemplate(pdf_path, pagesize=A4)
+            styles = getSampleStyleSheet()
+            story = []
+            
+            # Başlık
+            title_style = ParagraphStyle(
+                'CustomTitle',
+                parent=styles['Heading1'],
+                fontSize=24,
+                spaceAfter=30
+            )
+            story.append(Paragraph("Mülakat Raporu", title_style))
+            story.append(Spacer(1, 12))
+            
+            # Mülakat bilgileri
+            info_style = ParagraphStyle(
+                'Info',
+                parent=styles['Normal'],
+                fontSize=12,
+                spaceAfter=6
+            )
+            story.append(Paragraph(f"Aday: {self.candidate_name}", info_style))
+            story.append(Paragraph(f"Pozisyon: {self.position}", info_style))
+            story.append(Paragraph(f"Tarih: {self.start_time.strftime('%d.%m.%Y %H:%M')}", info_style))
+            story.append(Spacer(1, 20))
+            
+            # Performans metrikleri
+            story.append(Paragraph("Performans Değerlendirmesi", styles['Heading2']))
+            story.append(Spacer(1, 12))
+            
+            metrics_data = [
+                ["Metrik", "Puan"],
+                ["İletişim Becerisi", f"{self.metrics['iletisim_puani']:.1f}"],
+                ["Özgüven", f"{self.metrics['ozguven_puani']:.1f}"],
+                ["Teknik Bilgi", f"{self.metrics['teknik_bilgi']:.1f}"],
+                ["Genel Puan", f"{self.metrics['genel_puan']:.1f}"]
+            ]
+            
+            t = Table(metrics_data, colWidths=[300, 100])
+            t.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, 0), 14),
+                ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+                ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+                ('TEXTCOLOR', (0, 1), (-1, -1), colors.black),
+                ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+                ('FONTSIZE', (0, 1), (-1, -1), 12),
+                ('GRID', (0, 0), (-1, -1), 1, colors.black)
+            ]))
+            story.append(t)
+            story.append(Spacer(1, 20))
+            
+            # Konuşma geçmişi
+            story.append(Paragraph("Mülakat Detayları", styles['Heading2']))
+            story.append(Spacer(1, 12))
+            
+            for entry in self.conversation_history:
+                if entry["role"] == "user":
+                    story.append(Paragraph(f"<b>Aday:</b> {entry['content']}", styles['Normal']))
+                else:
+                    story.append(Paragraph(f"<b>Mülakat Uzmanı:</b> {entry['content']}", styles['Normal']))
+                story.append(Spacer(1, 12))
+            
+            # PDF oluştur
+            doc.build(story)
+            logger.info(f"PDF raporu başarıyla oluşturuldu: {pdf_path}")
+            return pdf_path
+            
+        except Exception as e:
+            logger.error(f"PDF rapor oluşturma hatası: {str(e)}")
+            return None
 
-        .status-dot.listening {
-            background: #ef4444;
-            animation: blink 1s infinite;
-        }
+    def send_report_email(self, pdf_path):
+        try:
+            # E-posta oluştur
+            msg = MIMEMultipart()
+            msg['From'] = REPORT_SENDER
+            msg['To'] = REPORT_RECIPIENT
+            msg['Subject'] = f"Mülakat Raporu - {self.candidate_name} - {self.position}"
+            
+            # E-posta metni
+            body = f"""
+            Merhaba,
+            
+            {self.candidate_name} adayı ile {self.position} pozisyonu için yapılan mülakat raporu ekte yer almaktadır.
+            
+            Mülakat Bilgileri:
+            - Aday: {self.candidate_name}
+            - Pozisyon: {self.position}
+            - Tarih: {self.start_time.strftime('%d.%m.%Y %H:%M')}
+            - Genel Puan: {self.metrics['genel_puan']:.1f}/100
+            
+            Detaylı değerlendirme için ekteki PDF dosyasını inceleyebilirsiniz.
+            
+            İyi çalışmalar,
+            AIVA Mülakat Asistanı
+            """
+            msg.attach(MIMEText(body, 'plain'))
+            
+            # PDF ekle
+            with open(pdf_path, "rb") as f:
+                pdf = MIMEApplication(f.read(), _subtype="pdf")
+                pdf.add_header('Content-Disposition', 'attachment', filename=os.path.basename(pdf_path))
+                msg.attach(pdf)
+            
+            # E-postayı gönder
+            with smtplib.SMTP(SMTP_SERVER, SMTP_PORT) as server:
+                server.starttls()
+                server.login(SMTP_USERNAME, SMTP_PASSWORD)
+                server.send_message(msg)
 
-        .auto-mode .status-indicator {
-            background: #4f46e5;
-            color: white;
-        }
+            # Webhook'a rapor gönder
+            self.send_report_webhook(pdf_path)
+            
+            return True
+        except Exception as e:
+            print(f"E-posta gönderme hatası: {str(e)}")
+            return False
 
-        .auto-mode-indicator {
-            display: inline-flex;
-            align-items: center;
-            margin-left: 0.5rem;
-            animation: pulse 2s infinite;
-        }
+    def send_report_webhook(self, pdf_path):
+        try:
+            # Konuşma geçmişini düzgün şekilde hazırla
+            conversation_flow = []
+            for entry in self.conversation_history:
+                conversation_flow.append({
+                    "soru_cevap": entry["content"] if entry["role"] == "user" else "",
+                    "degerlendirme": entry["content"] if entry["role"] == "assistant" else ""
+                })
+                
+                # Webhook verisi
+                webhook_data = {
+                    "aday_bilgileri": {
+                        "isim": self.candidate_name,
+                        "pozisyon": self.position,
+                        "tarih": self.start_time.strftime('%d.%m.%Y %H:%M')
+                    },
+                    "metrikler": self.metrics,
+                    "konusma_akisi": conversation_flow
+                }
+                
+            # Webhook isteği gönder
+            response = requests.post(
+                WEBHOOK_URL,
+                json=webhook_data,
+                headers={'Content-Type': 'application/json'}
+            )
+            
+            if response.status_code != 200:
+                logger.error(f"Webhook hatası: {response.status_code} - {response.text}")
+                return False
+                
+            return True
+            
+        except Exception as e:
+            logger.error(f"Webhook gönderme hatası: {str(e)}")
+            return False
 
-        .volume-waves {
-            position: absolute;
-            width: 100%;
-            height: 100%;
-            border-radius: 50%;
-            pointer-events: none;
-        }
+def generate_interview_code():
+    """Benzersiz bir mülakat kodu oluştur"""
+    code = ''.join(secrets.choice(string.ascii_uppercase + string.digits) for _ in range(8))
+    return code
 
-        .volume-waves::before,
-        .volume-waves::after {
-            content: '';
-            position: absolute;
-            width: 100%;
-            height: 100%;
-            border-radius: 50%;
-            background: rgba(79, 70, 229, 0.2);
-            animation: waves 2s infinite;
-        }
+@app.route('/')
+def home():
+    return render_template('create_interview.html')
 
-        .volume-waves::after {
-            animation-delay: 1s;
-        }
+@app.route('/join')
+def join():
+    return render_template('interview_entry.html')
 
-        @keyframes waves {
-            0% {
-                transform: scale(1);
-                opacity: 0.5;
-            }
-            100% {
-                transform: scale(1.5);
-                opacity: 0;
-            }
-        }
+@app.route('/interview')
+def interview():
+    code = request.args.get('code')
+    if not code or code not in interview_data:
+        # JSON dosyasından okuma yapalım
+        try:
+            json_path = os.path.join('interviews', f'{code}.json')
+            if os.path.exists(json_path):
+                with open(json_path, 'r', encoding='utf-8') as f:
+                    interview_json = json.load(f)
+                    
+                # Interview data'yı güncelle
+                interview_data[code] = {
+                    "candidate_info": {
+                        "name": interview_json.get("candidate_name"),
+                        "position": interview_json.get("position"),
+                        "requirements": interview_json.get("requirements", []),
+                        "custom_questions": interview_json.get("questions", [])
+                    },
+                    "created_at": interview_json.get("created_at", datetime.now().isoformat()),
+                    "expires_at": (datetime.now() + timedelta(hours=24)).isoformat(),
+                    "status": "active"
+                }
+            else:
+                return "Geçersiz veya süresi dolmuş mülakat kodu", 404
+        except Exception as e:
+            logger.error(f"JSON okuma hatası: {str(e)}")
+            return "Mülakat verisi okunamadı", 500
 
-        @keyframes blink {
-            0% { opacity: 1; }
-            50% { opacity: 0.5; }
-            100% { opacity: 1; }
-        }
+    interview = interview_data[code]
+    
+    # Global current_interview'ı oluştur
+    global current_interview
+    current_interview = InterviewAssistant()
+    current_interview.set_interview_details(code)
+    
+    return render_template('interview.html', 
+                         interview={
+                             "candidate_name": interview["candidate_info"]["name"],
+                             "position": interview["candidate_info"]["position"],
+                             "code": code,
+                             "created_at": interview["created_at"]
+                         })
 
-        .completed {
-            background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+@app.route('/create_interview', methods=['POST'])
+def handle_create_interview():
+    try:
+        data = request.get_json()
+        candidate_name = data.get('candidate_name')
+        position = data.get('position')
+
+        if not candidate_name or not position:
+            return jsonify({
+                'success': False,
+                'error': 'Aday adı ve pozisyon gereklidir'
+            })
+
+        interview_code = create_interview(candidate_name, position)
+        return jsonify({
+            'success': True,
+            'code': interview_code
+        })
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        })
+
+@app.route('/verify_code', methods=['POST'])
+def verify_code():
+    try:
+        data = request.get_json()
+        code = data.get('code')
+
+        if not code:
+            return jsonify({
+                'success': False,
+                'error': 'Mülakat kodu gereklidir'
+            })
+
+        interview_data = get_interview_by_code(code)
+        if interview_data:
+            return jsonify({'success': True})
+        else:
+            return jsonify({
+                'success': False,
+                'error': 'Geçersiz mülakat kodu'
+            })
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        })
+
+@app.route('/start_interview', methods=['POST'])
+async def start_interview():
+    try:
+        data = request.json
+        if not data or 'candidate_name' not in data or 'position' not in data:
+            return jsonify({
+                "success": False,
+                "error": "Aday adı ve pozisyon bilgisi gerekli"
+            }), 400
+
+        global current_interview
+        current_interview = InterviewAssistant()
+        current_interview.set_interview_details(
+            data['candidate_name'],
+            data['position']
+        )
+        
+        # Soruları hazırla ve kaydet
+        interview_code = ''.join(random.choices(string.ascii_uppercase + string.digits, k=8))
+        questions_file = os.path.join('interviews', f'{interview_code}.json')
+        
+        if not os.path.exists('interviews'):
+            os.makedirs('interviews')
+            
+        with open(questions_file, 'w', encoding='utf-8') as f:
+            json.dump({
+                'candidate_name': data['candidate_name'],
+                'position': data['position'],
+                'questions': current_interview.interview_questions
+            }, f, ensure_ascii=False, indent=2)
+        
+        logger.info(f"Mülakat başlatıldı: {data['candidate_name']} - {data['position']}")
+        
+        return jsonify({
+            "success": True,
+            "message": "Mülakat başarıyla başlatıldı",
+            "code": interview_code
+        })
+        
+    except Exception as e:
+        logger.error(f"Mülakat başlatma hatası: {str(e)}")
+        return jsonify({
+            "success": False,
+            "error": f"Mülakat başlatılamadı: {str(e)}"
+        }), 500
+
+@app.route('/start_recording', methods=['POST'])
+async def start_recording():
+    try:
+        if not current_interview:
+            return jsonify({
+                "success": False,
+                "error": "Lütfen önce mülakatı başlatın"
+            }), 400
+            
+        # Ses kaydını başlat
+        recording = current_interview.record_audio()
+        if recording:
+            filename = current_interview.save_audio(recording)
+            return jsonify({
+                "success": True,
+                "message": "Ses kaydı başarıyla tamamlandı",
+                "filename": filename
+            })
+        else:
+            return jsonify({
+                "success": False,
+                "error": "Ses kaydı alınamadı"
+            }), 400
+        
+    except Exception as e:
+        logger.error(f"Ses kaydı başlatma hatası: {str(e)}")
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
+
+@app.route('/process_audio', methods=['POST'])
+async def process_audio():
+    try:
+        if 'audio' not in request.files:
+            return jsonify({
+                "success": False,
+                "error": "Ses dosyası bulunamadı",
+                "continue_listening": True
+            }), 400
+            
+        audio_file = request.files['audio']
+        
+        # Geçici dosya yolu oluştur
+        temp_dir = 'temp'
+        if not os.path.exists(temp_dir):
+            os.makedirs(temp_dir)
+            
+        temp_path = os.path.join(temp_dir, f'temp_audio_{time.time()}.wav')
+        webm_path = temp_path + '.webm'
+        
+        try:
+            # WebM dosyasını kaydet
+            audio_file.save(webm_path)
+            
+            # FFmpeg komutu
+            ffmpeg_command = [
+                'ffmpeg', '-y',
+                '-i', webm_path,
+                '-acodec', 'pcm_s16le',
+                '-ac', '1',
+                '-ar', '16000',
+                temp_path
+            ]
+            
+            subprocess.run(ffmpeg_command, check=True, capture_output=True)
+            
+            # Ses seviyesi analizi
+            data, _ = sf.read(temp_path)
+            volume_level = float(np.max(np.abs(data)) * 100)
+            
+            # Sessizlik kontrolü - daha toleranslı
+            if volume_level < SILENCE_THRESHOLD / 2:  # Eşiği yarıya indirdik
+                logger.warning(f"Ses seviyesi düşük: {volume_level}")
+                return jsonify({
+                    "success": False,
+                    "error": "Ses seviyesi çok düşük, lütfen daha yüksek sesle konuşun",
+                    "continue_listening": True,
+                    "should_restart": True
+                }), 200  # 400 yerine 200 dönüyoruz
+
+            try:
+                # Google Speech client
+                client = speech.SpeechClient()
+                
+                with open(temp_path, 'rb') as audio_file:
+                    content = audio_file.read()
+                
+                # Ses tanıma yapılandırması - daha toleranslı
+                audio = speech.RecognitionAudio(content=content)
+                config = speech.RecognitionConfig(
+                    encoding=speech.RecognitionConfig.AudioEncoding.LINEAR16,
+                    sample_rate_hertz=16000,
+                    language_code="tr-TR",
+                    enable_automatic_punctuation=True,
+                    use_enhanced=True,
+                    audio_channel_count=1,
+                    enable_word_time_offsets=True,
+                    enable_word_confidence=True,
+                    model="command_and_search",  # Daha kısa cümleler için optimize
+                    profanity_filter=False
+                )
+                
+                # Ses tanıma işlemi
+                response = await asyncio.get_event_loop().run_in_executor(
+                    None,
+                    lambda: client.recognize(config=config, audio=audio)
+                )
+                
+                if not response.results:
+                    logger.warning("Ses tanınamadı - Sonuç boş")
+                    return jsonify({
+                        "success": False,
+                        "error": "Ses tanınamadı, lütfen tekrar konuşun",
+                        "continue_listening": True,
+                        "should_restart": True
+                    }), 200  # 400 yerine 200 dönüyoruz
+                    
+                transcript = response.results[0].alternatives[0].transcript
+                confidence = response.results[0].alternatives[0].confidence
+                
+                logger.info(f"Tanınan metin: {transcript} (Güven: {confidence:.2f})")
+                
+                # Güven skoru kontrolü - daha toleranslı
+                if confidence < MIN_CONFIDENCE / 2:  # Eşiği yarıya indirdik
+                    return jsonify({
+                        "success": False,
+                        "error": "Ses net anlaşılamadı, lütfen tekrar konuşun",
+                        "continue_listening": True,
+                        "should_restart": True,
+                        "transcript": transcript,  # Transcript'i de gönderelim
+                        "confidence": confidence
+                    }), 200  # 400 yerine 200 dönüyoruz
+                
+                # GPT yanıtı al
+                if current_interview:
+                    # GPT yanıtını hemen al
+                    gpt_response = await current_interview.get_gpt_response(transcript)
+                    
+                    # Analizi arka planda yap
+                    asyncio.create_task(current_interview._analyze_sentiment(transcript))
+                    
+                    return jsonify({
+                        "success": True,
+                        "transcript": transcript,
+                        "response": gpt_response,
+                        "metrics": current_interview.metrics,
+                        "continue_listening": True,
+                        "confidence": confidence
+                    })
+                else:
+                    return jsonify({
+                        "success": False,
+                        "error": "Mülakat henüz başlatılmadı",
+                        "continue_listening": False
+                    }), 200  # 400 yerine 200 dönüyoruz
+                    
+            except Exception as e:
+                logger.error(f"Ses tanıma hatası: {str(e)}")
+                return jsonify({
+                    "success": False,
+                    "error": "Ses tanıma hatası: " + str(e),
+                    "continue_listening": True,
+                    "should_restart": True
+                }), 200  # 400 yerine 200 dönüyoruz
+            finally:
+                # Geçici dosyaları temizle
+                for file_path in [webm_path, temp_path]:
+                    if os.path.exists(file_path):
+                        try:
+                            os.remove(file_path)
+                        except Exception as e:
+                            logger.error(f"Dosya silme hatası ({file_path}): {str(e)}")
+                
+        except Exception as e:
+            logger.error(f"Genel hata: {str(e)}")
+            return jsonify({
+                "success": False,
+                "error": str(e),
+                "continue_listening": True,
+                "should_restart": True
+            }), 200  # 400 yerine 200 dönüyoruz
+    except Exception as e:
+        logger.error(f"Ses işleme hatası: {str(e)}")
+        return jsonify({
+            "success": False,
+            "error": "Ses işleme hatası: " + str(e),
+            "continue_listening": True,
+            "should_restart": True
+        }), 200  # 400 yerine 200 dönüyoruz
+
+@app.route('/generate_report', methods=['POST'])
+async def generate_report():
+    try:
+        if not current_interview:
+            return jsonify({
+                "success": False,
+                "error": "Mülakat oturumu bulunamadı"
+            }), 400
+
+        # Konuşma geçmişini al
+        conversation_history = request.json.get('conversation_history', [])
+        
+        # GPT ile değerlendirme yap
+        evaluation_prompt = f"""
+        Aşağıdaki mülakat konuşmasını değerlendir ve bir rapor oluştur:
+        
+        Aday: {current_interview.candidate_name}
+        Pozisyon: {current_interview.position}
+        
+        Konuşma Geçmişi:
+        {json.dumps(conversation_history, indent=2, ensure_ascii=False)}
+        
+        Lütfen aşağıdaki başlıklara göre değerlendirme yap:
+        1. Teknik Bilgi ve Deneyim
+        2. İletişim Becerileri
+        3. Problem Çözme Yeteneği
+        4. Genel Değerlendirme
+        5. Öneriler
+        """
+        
+        evaluation_response = await asyncio.get_event_loop().run_in_executor(
+            current_interview.executor,
+            lambda: current_interview.openai_client.chat.completions.create(
+                model="gpt-4",
+                messages=[
+                    {"role": "system", "content": "Sen bir mülakat değerlendirme uzmanısın."},
+                    {"role": "user", "content": evaluation_prompt}
+                ],
+                temperature=0.7,
+                max_tokens=1000
+            )
+        )
+        
+        evaluation = evaluation_response.choices[0].message.content
+        
+        # PDF raporu oluştur
+        pdf_path = current_interview.generate_pdf_report()
+        if not pdf_path:
+            return jsonify({
+                "success": False,
+                "error": "PDF raporu oluşturulamadı"
+            }), 500
+        
+        # Raporu e-posta ile gönder
+        if current_interview.send_report_email(pdf_path):
+            # Webhook'a gönder
+            current_interview.send_report_webhook(pdf_path)
+            
+            return jsonify({
+                "success": True,
+                "message": "Rapor oluşturuldu ve gönderildi",
+                "evaluation": evaluation
+            })
+        else:
+            return jsonify({
+                "success": False,
+                "error": "Rapor gönderilemedi"
+            }), 500
+            
+    except Exception as e:
+        logger.error(f"Rapor oluşturma hatası: {str(e)}")
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
+
+@app.route('/check_audio_support', methods=['GET'])
+def check_audio_support():
+    """Desteklenen ses formatlarını kontrol et"""
+    try:
+        supported_formats = {
+            'webm': True,
+            'wav': True,
+            'mp3': True,
+            'ogg': True
+        }
+        return jsonify({
+            'success': True,
+            'supported_formats': supported_formats
+        })
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+# Veritabanı bağlantısı için yardımcı fonksiyon
+def get_db_connection():
+    try:
+        conn = sqlite3.connect('data/interview.db')
+        conn.row_factory = sqlite3.Row
+        return conn
+    except Exception as e:
+        logger.error(f"Veritabanı bağlantı hatası: {str(e)}")
+        raise
+
+def create_or_get_interview_code(email):
+    """Email adresine göre mülakat kodu oluştur veya var olanı getir"""
+    conn = get_db_connection()
+    try:
+        # Önce mevcut kodu kontrol et
+        cursor = conn.execute('SELECT code FROM interview_codes WHERE email = ?', (email,))
+        result = cursor.fetchone()
+        
+        if result:
+            return result['code']
+            
+        # Yeni kod oluştur
+        while True:
+            # Email'den benzersiz bir kod oluştur
+            hash_object = hashlib.md5(email.encode())
+            code = hash_object.hexdigest()[:6].upper()
+            
+            # Kodun benzersiz olduğunu kontrol et
+            cursor = conn.execute('SELECT code FROM interview_codes WHERE code = ?', (code,))
+            if not cursor.fetchone():
+                break
+        
+        # Yeni kodu kaydet
+        conn.execute('INSERT INTO interview_codes (email, code, created_at) VALUES (?, ?, ?)',
+                    (email, code, datetime.now().isoformat()))
+        conn.commit()
+        return code
+    finally:
+        conn.close()
+
+def save_interview_data(data, code):
+    """Mülakat verilerini JSON dosyası olarak kaydet"""
+    try:
+        # Veriyi yeni formata dönüştür
+        formatted_data = {
+            "code": code,
+            "candidate_name": data.get('adSoyad') or data.get('candidate_name'),
+            "position": data.get('isIlaniPozisyonu') or data.get('position'),
+            "questions": data.get('mulakatSorulari') or data.get('questions', [
+                "1. Yapay zekanın temel bileşenleri hakkında bilgi verebilir misiniz?",
+                "2. Belirli bir veri setinde overfitting problemini nasıl tanımlar ve çözersiniz?",
+                "3. Günlük çalışmalarınızda hangi yapay zeka frameworklerini kullandınız?",
+                "4. Çeşitli regresyon teknikleri hakkında bilgi verebilir misiniz?",
+                "5. NLP konusunda ne gibi deneyimleriniz var?"
+            ]),
+            "status": data.get('status', 'pending'),
+            "created_at": data.get('created_at', datetime.now().isoformat()),
+            "updated_at": data.get('updated_at', datetime.now().isoformat())
         }
         
-        .paused {
-            opacity: 0.7;
-        }
-
-        /* Modal Styles */
-        .modal {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.5);
-            z-index: 1000;
-            align-items: center;
-            justify-content: center;
-            backdrop-filter: blur(5px);
-        }
-
-        .modal-content {
-            background: white;
-            padding: 2.5rem;
-            border-radius: 1.5rem;
-            max-width: 600px;
-            width: 90%;
-            position: relative;
-            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
-            border: 1px solid rgba(251, 191, 36, 0.2);
-        }
-
-        .modal-header {
-            font-size: 1.8rem;
-            font-weight: bold;
-            margin-bottom: 1.5rem;
-            color: var(--primary-dark);
-            text-align: center;
-        }
-
-        .modal-body {
-            margin-bottom: 2rem;
-        }
-
-        .modal-body p {
-            margin-bottom: 1.5rem;
-            line-height: 1.6;
-        }
-
-        .modal-body ul {
-            margin-left: 1.5rem;
-            margin-top: 0.5rem;
-        }
-
-        .modal-body li {
-            margin-bottom: 0.5rem;
-            color: var(--text);
-        }
-
-        .modal-footer {
-            text-align: center;
-        }
-
-        .modal-button {
-            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
-            color: white;
-            padding: 1rem 2rem;
-            border-radius: 1rem;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            border: none;
-            font-size: 1.1rem;
-            font-weight: 500;
-            box-shadow: 0 4px 15px rgba(251, 191, 36, 0.3);
-        }
-
-        .modal-button:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 6px 20px rgba(251, 191, 36, 0.4);
-        }
-    </style>
-</head>
-<body>
-    <!-- AIVA Logo -->
-    <img src="https://www.aivatech.io/wp-content/uploads/2023/09/AIVA-App-Logo1-1200-x-300piksel-1-1-1024x256.png" alt="AIVA Logo" class="aiva-logo">
-
-    <!-- Bilgilendirme Modal -->
-    <div id="infoModal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                Mülakat Bilgilendirmesi
-            </div>
-            <div class="modal-body">
-                <p>�� <strong>Mülakat Başlatma:</strong>
-                    <ul>
-                        <li>Robot simgesine tıklayarak mülakatı başlatabilirsiniz</li>
-                        <li>Mikrofon izni vermeniz gerekecektir</li>
-                    </ul>
-                </p>
-                
-                <p>🎤 <strong>Manuel Mod:</strong>
-                    <ul>
-                        <li>Space tuşuna basılı tutarak konuşun</li>
-                        <li>Tuşu bıraktığınızda kayıt otomatik durur</li>
-                    </ul>
-                </p>
-                
-                <p>🔄 <strong>Otomatik Mod:</strong>
-                    <ul>
-                        <li>Robot simgesine ikinci kez tıklayarak otomatik moda geçebilirsiniz</li>
-                        <li>Ses seviyeniz algılandığında kayıt otomatik başlar ve durur</li>
-                    </ul>
-                </p>
-                
-                <p>⚠️ <strong>Önemli Notlar:</strong>
-                    <ul>
-                        <li>GPT'nin konuşması bitene kadar bekleyin</li>
-                        <li>"Otomatik dinleme aktif" yazısını görmeden konuşmaya başlamayın</li>
-                        <li>Net ve yavaş konuşun</li>
-                        <li>Cevaplarınızı çok geciktirmeyin</li>
-                    </ul>
-                </p>
-            </div>
-            <div class="modal-footer">
-                <button class="modal-button" onclick="closeModal()">Anladım, Başla</button>
-            </div>
-        </div>
-    </div>
-
-        <!-- Header -->
-    <div class="header">
-        <div class="max-w-7xl mx-auto px-4">
-            <div class="flex justify-between items-center">
-                <div>
-                    <h1 class="text-2xl font-bold text-gray-800">{{ interview.candidate_name }}</h1>
-                    <p class="text-gray-600">{{ interview.position }}</p>
-                </div>
-                <div class="text-right">
-                    <p class="text-sm text-gray-500">Mülakat Kodu: {{ interview.code }}</p>
-                    <p class="text-xs text-gray-500">{{ interview.created_at }}</p>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-    <div class="chat-container">
-        <!-- AIVA Avatar -->
-        <div class="aiva-avatar" id="aivaAvatar">
-            <div class="listening-animation"></div>
-            <i class="fas fa-robot text-white text-7xl"></i>
-            <div class="mode-indicator">
-                <div class="icon" id="modeIcon"></div>
-                <span id="modeText">Dinlemeye hazır</span>
-                </div>
-            </div>
-
-        <!-- Chat Messages -->
-        <div id="messages" class="chat-messages">
-            <div class="chat-bubble assistant-bubble">
-                <p>Merhaba {{ interview.candidate_name }}, {{ interview.position }} pozisyonu için mülakatımıza hoş geldiniz. Size nasıl yardımcı olabilirim?</p>
-            </div>
-        </div>
-    </div>
-
-    <script>
-        let mediaRecorder = null;
-        let audioChunks = [];
-        let isRecording = false;
-        let audioContext = null;
-        let analyser = null;
-        let silenceStart = null;
-        let silenceTimeout = null;
-        let isAutoMode = true;
-        let isGPTSpeaking = false; // GPT konuşma durumu
-        let interviewEnded = false; // Mülakat bitiş durumu
-        let speechQueue = [];
-        let isSpeaking = false;
-        let utteranceQueue = [];
-        let isProcessingUtterance = false;
-        let audioStream = null;
-        let isAudioInitialized = false;
-        let isMediaRecorderReady = false;
-        let interviewCode = new URLSearchParams(window.location.search).get('code');
-
-        // Ses seviyesi eşikleri
-        const SILENCE_THRESHOLD = 0.05;  // Sessizlik eşiği (app2.py'dan alındı)
-        const VOICE_THRESHOLD = 0.15;    // Konuşma başlangıç eşiği
-        const SILENCE_DURATION = 1500;   // Sessizlik süresi (ms)
-        const MIN_CONFIDENCE = 0.6;      // Minimum güven skoru
-
-        async function initAudio() {
-            try {
-                // Önceki ses akışını temizle
-                if (audioStream) {
-                    audioStream.getTracks().forEach(track => track.stop());
-                }
-                
-                // Önceki AudioContext'i kapat
-                if (audioContext) {
-                    await audioContext.close();
-                }
-                
-                // Yeni ses akışı al
-                audioStream = await navigator.mediaDevices.getUserMedia({ 
-                    audio: {
-                        echoCancellation: true,
-                        noiseSuppression: true,
-                        autoGainControl: true,
-                        channelCount: 1,
-                        sampleRate: 16000
-                    }
-                });
-                
-                // Yeni AudioContext oluştur
-                audioContext = new (window.AudioContext || window.webkitAudioContext)();
-                analyser = audioContext.createAnalyser();
-                const source = audioContext.createMediaStreamSource(audioStream);
-                source.connect(analyser);
-                analyser.fftSize = 2048;
-                
-                // MediaRecorder'ı yeniden oluştur
-                if (mediaRecorder) {
-                    mediaRecorder.ondataavailable = null;
-                    mediaRecorder.onstop = null;
-                }
-                
-                mediaRecorder = new MediaRecorder(audioStream, {
-                    mimeType: 'audio/webm;codecs=opus',
-                    audioBitsPerSecond: 16000
-                });
-                
-                mediaRecorder.ondataavailable = (event) => {
-                    if (!isGPTSpeaking && event.data.size > 0) {
-                        audioChunks.push(event.data);
-                    }
-                };
-                
-                mediaRecorder.onstop = async () => {
-                    if (!isGPTSpeaking && audioChunks.length > 0) {
-                        const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
-                        if (audioBlob.size > 0) {
-                            try {
-                                await sendAudioToServer(audioBlob);
-                            } catch (error) {
-                                console.error('Ses gönderme hatası:', error);
-                                showError('Ses işlenirken bir hata oluştu');
-                            }
-                        }
-                        audioChunks = [];
-                    }
-                };
-                
-                isMediaRecorderReady = true;
-                isAudioInitialized = true;
-                return true;
-            } catch (error) {
-                console.error('Ses sistemi başlatma hatası:', error);
-                showError('Mikrofon erişimi sağlanamadı');
-                isMediaRecorderReady = false;
-                isAudioInitialized = false;
-                return false;
-            }
-        }
-
-        async function stopAudioSystem() {
-            try {
-                if (mediaRecorder && mediaRecorder.state === 'recording') {
-                    mediaRecorder.stop();
-                }
-                
-                if (audioContext) {
-                    await audioContext.suspend();
-                }
-                
-                if (audioStream) {
-                    audioStream.getTracks().forEach(track => track.stop());
-                }
-                
-                isAudioInitialized = false;
-            } catch (error) {
-                console.error('Ses sistemi durdurma hatası:', error);
-            }
-        }
-
-        function startVoiceDetection() {
-            if (!analyser || !isAutoMode || isSpeaking || isGPTSpeaking || isProcessingUtterance) return;
+        file_path = os.path.join('interviews', f'{code}.json')
+        with open(file_path, 'w', encoding='utf-8') as f:
+            json.dump(formatted_data, f, ensure_ascii=False, indent=2)
             
-            const bufferLength = analyser.frequencyBinCount;
-            const dataArray = new Uint8Array(bufferLength);
-            
-        function checkAudioLevel() {
-                if (!isAutoMode || isSpeaking || isGPTSpeaking || isProcessingUtterance) return;
+        logger.info(f"Mülakat verisi kaydedildi: {code}")
+        return file_path
+    except Exception as e:
+        logger.error(f"JSON kaydetme hatası: {str(e)}")
+        return None
 
-            analyser.getByteFrequencyData(dataArray);
-                const average = dataArray.reduce((a, b) => a + b) / bufferLength;
-            const volume = average / 128.0;
-            
-                updateVolumeIndicator(volume);
+def send_webhook_notification(webhook_url, data):
+    """Webhook'a bildirim gönder"""
+    try:
+        response = requests.post(
+            webhook_url,
+            json=data,
+            headers={'Content-Type': 'application/json'}
+        )
+        return response.status_code == 200
+    except Exception as e:
+        logger.error(f"Webhook gönderme hatası: {str(e)}")
+        return False
 
-                if (!isRecording && volume > VOICE_THRESHOLD) {
-                    startRecording();
-                } else if (isRecording && volume < SILENCE_THRESHOLD) {
-                if (!silenceStart) {
-                    silenceStart = Date.now();
-                    } else if (Date.now() - silenceStart > SILENCE_DURATION) {
-                    stopRecording();
-                        silenceStart = null;
-                }
-            } else {
-                silenceStart = null;
-            }
-            
-                if (isAutoMode && !isSpeaking && !isGPTSpeaking && !isProcessingUtterance) {
-                requestAnimationFrame(checkAudioLevel);
-            }
+@app.route('/webhook/interview', methods=['POST'])
+def webhook_interview_handler():
+    try:
+        data = request.json
+        if not data:
+            return jsonify({"error": "Veri bulunamadı"}), 400
+
+        # Mülakat kodu oluştur
+        interview_code = generate_interview_code()
+        
+        # JSON dosyasını oluştur
+        interview_data = {
+            "code": interview_code,
+            "candidate_name": data.get("adSoyad"),
+            "position": data.get("isIlaniPozisyonu"),
+            "requirements": data.get("isIlaniGereksinimleri", []),
+            "questions": data.get("mulakatSorulari", []),
+            "created_at": datetime.now().isoformat(),
+            "status": "pending"
+        }
+        
+        # JSON dosyasını kaydet
+        json_path = os.path.join('interviews', f'{interview_code}.json')
+        with open(json_path, 'w', encoding='utf-8') as f:
+            json.dump(interview_data, f, ensure_ascii=False, indent=2)
+        
+        # Global interview_data'yı güncelle
+        interview_data[interview_code] = {
+            "candidate_info": {
+                "name": data.get("adSoyad"),
+                "email": data.get("mail"),
+                "position": data.get("isIlaniPozisyonu"),
+                "requirements": data.get("isIlaniGereksinimleri", []),
+                "custom_questions": data.get("mulakatSorulari", [])
+            },
+            "created_at": datetime.now().isoformat(),
+            "expires_at": (datetime.now() + timedelta(hours=24)).isoformat(),
+            "status": "pending"
         }
 
-            requestAnimationFrame(checkAudioLevel);
+        # Webhook yanıtını hazırla
+        response_data = {
+            "success": True,
+            "interview_code": interview_code,
+            "interview_url": f"{request.host_url}interview?code={interview_code}",
+            "expires_at": interview_data[interview_code]["expires_at"]
         }
 
-        function updateVolumeIndicator(volume) {
-            const volumeWaves = document.querySelector('.volume-waves');
-            if (volumeWaves) {
-                volumeWaves.style.opacity = volume;
-            }
+        return jsonify(response_data)
+
+    except Exception as e:
+        logger.error(f"Webhook alım hatası: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+if __name__ == '__main__':
+    try:
+        # Veritabanını hazırla
+        init_db()
+        
+        # Dosya izleme sistemini başlat
+        observer = start_file_watcher()
+        
+        # Flask uygulamasını başlat
+        app.run(host='0.0.0.0', port=5004)
+        
+    except Exception as e:
+        logger.critical(f"Program başlatılamadı: {str(e)}")
+    finally:
+        if 'observer' in locals() and observer:
+            observer.stop()
+            observer.join()
             
-            const statusDot = document.getElementById('statusDot');
-            if (volume > VOICE_THRESHOLD) {
-                statusDot.style.backgroundColor = '#ef4444'; // Kırmızı
-            } else if (volume > SILENCE_THRESHOLD) {
-                statusDot.style.backgroundColor = '#22c55e'; // Yeşil
-            } else {
-                statusDot.style.backgroundColor = '#6b7280'; // Gri
-            }
-        }
-
-        function toggleRecording() {
-            if (!mediaRecorder) {
-                initAudio().then((initialized) => {
-                    if (initialized) {
-                        isAutoMode = true;
-                        startVoiceDetection();
-                        updateStatus('Otomatik mod aktif', 'auto');
-                    }
-                });
-                return;
-            }
-
-            if (isRecording) {
-                stopRecording();
-            } else {
-                isAutoMode = true;
-                startVoiceDetection();
-                updateStatus('Otomatik mod aktif', 'auto');
-            }
-        }
-
-        function startRecording() {
-            if (!mediaRecorder || isRecording) return;
             
-            try {
-                if (mediaRecorder.state === 'recording') {
-                    console.log('MediaRecorder zaten kayıt yapıyor');
-                    return;
-                }
-                
-                if (!isMediaRecorderReady) {
-                    console.log('MediaRecorder hazır değil, yeniden başlatılıyor');
-                    initAudio().then((initialized) => {
-                        if (initialized) {
-                mediaRecorder.start();
-                            isRecording = true;
-                            updateRecordingUI(true);
-                        }
-                    });
-                    return;
-                }
-                
-                mediaRecorder.start();
-                isRecording = true;
-                updateRecordingUI(true);
-                
-            } catch (error) {
-                console.error('Kayıt başlatma hatası:', error);
-                showError('Kayıt başlatılamadı');
-                isRecording = false;
-                isMediaRecorderReady = false;
-                updateRecordingUI(false);
-            }
-        }
-
-        function stopRecording() {
-            if (!mediaRecorder || !isRecording) return;
             
-            try {
-                if (mediaRecorder.state === 'inactive') {
-                    console.log('MediaRecorder zaten durmuş');
-                    return;
-                }
-                
-                mediaRecorder.stop();
-                isRecording = false;
-                updateRecordingUI(false);
-                
-            } catch (error) {
-                console.error('Kayıt durdurma hatası:', error);
-                showError('Kayıt durdurulamadı');
-                isRecording = false;
-                updateRecordingUI(false);
-            }
-        }
-
-        function updateRecordingUI(isRecording) {
-            const modeIcon = document.getElementById('modeIcon');
-            const modeText = document.getElementById('modeText');
-            const avatar = document.getElementById('aivaAvatar');
-            const listeningAnimation = avatar.querySelector('.listening-animation');
             
-            if (isRecording) {
-                modeIcon.style.backgroundColor = '#ef4444';
-                modeText.textContent = 'Kaydediliyor...';
-                avatar.classList.add('speaking');
-                listeningAnimation.style.display = 'block';
-            } else {
-                modeIcon.style.backgroundColor = isAutoMode ? 'var(--primary)' : '#6b7280';
-                modeText.textContent = isAutoMode ? 'Dinleniyor...' : 'Dinlemeye hazır';
-                avatar.classList.remove('speaking');
-                listeningAnimation.style.display = isAutoMode ? 'block' : 'none';
-            }
-        }
-
-        function updateStatus(text, mode) {
-            const modeText = document.getElementById('modeText');
-            const modeIcon = document.getElementById('modeIcon');
-            const avatar = document.getElementById('aivaAvatar');
+        
+    
+    
+        
+        
             
-            modeText.textContent = text;
-            
-            if (mode === 'auto') {
-                avatar.classList.add('auto-mode');
-                modeIcon.style.backgroundColor = 'var(--primary)';
-                avatar.querySelector('.listening-animation').style.display = 'block';
-            } else if (mode === 'manual') {
-                avatar.classList.remove('auto-mode');
-                modeIcon.style.backgroundColor = '#6b7280';
-                avatar.querySelector('.listening-animation').style.display = 'none';
-            } else if (mode === 'recording') {
-                modeIcon.style.backgroundColor = '#ef4444';
-                avatar.classList.add('speaking');
-            } else if (mode === 'speaking') {
-                modeIcon.style.backgroundColor = 'var(--primary-dark)';
-                avatar.classList.add('speaking');
-            } else if (mode === 'paused') {
-                modeIcon.style.backgroundColor = '#6b7280';
-                avatar.classList.remove('speaking');
-                avatar.querySelector('.listening-animation').style.display = 'none';
-            }
-        }
 
-        async function speakResponse(text) {
-            return new Promise((resolve) => {
-                // Önceki konuşmaları temizle
-                window.speechSynthesis.cancel();
-                
-                // Ses sistemini durdur
-                stopAudioSystem();
-                
-                const utterance = new SpeechSynthesisUtterance(text);
-                utterance.lang = 'tr-TR';
-                utterance.rate = 1.0;
-                utterance.pitch = 1.0;
-                
-                utterance.onstart = () => {
-                    console.log('GPT konuşmaya başladı');
-                    isSpeaking = true;
-                    isGPTSpeaking = true;
-                    updateStatus('GPT konuşuyor...', 'speaking');
-                };
-                
-                utterance.onend = async () => {
-                    console.log('GPT konuşması bitti');
-                    isSpeaking = false;
-                    isGPTSpeaking = false;
-                    
-                    // GPT konuşması bittikten sonra ses sistemini yeniden başlat
-                    setTimeout(async () => {
-                        if (!interviewEnded) {
-                            await initAudio();
-                            if (isAutoMode) {
-                                startVoiceDetection();
-                                updateStatus('Otomatik dinleme aktif', 'auto');
-                            }
-                        }
-                    }, 2000); // 2 saniye bekle
-                    
-                    resolve();
-                };
-                
-                utterance.onerror = async (event) => {
-                    console.error('Konuşma hatası:', event.error);
-                    isSpeaking = false;
-                    isGPTSpeaking = false;
-                    
-                    setTimeout(async () => {
-                        if (!interviewEnded) {
-                            await initAudio();
-                            if (isAutoMode) {
-                                startVoiceDetection();
-                                updateStatus('Otomatik dinleme aktif', 'auto');
-                            }
-                        }
-                    }, 2000);
-                    
-                    resolve();
-                };
-                
-                window.speechSynthesis.speak(utterance);
-            });
-        }
 
-        async function initializeInterview() {
-            try {
-                // Mülakat kodunu kontrol et
-                if (!interviewCode) {
-                    showError('Geçersiz mülakat kodu');
-                    return false;
-                }
 
-                // Ses sistemini başlat
-                const initialized = await initAudio();
-                if (!initialized) {
-                    return false;
-                }
-
-                // UI'ı güncelle
-                updateStatus('Mülakat başlatılıyor...', 'auto');
-                document.getElementById('aivaAvatar').classList.remove('completed');
-
-                return true;
-            } catch (error) {
-                console.error('Mülakat başlatma hatası:', error);
-                showError('Mülakat başlatılamadı');
-                return false;
-            }
-        }
-
-        async function sendAudioToServer(audioBlob) {
-            try {
-                if (isSpeaking || isGPTSpeaking) {
-                    console.log('GPT konuşuyor, ses kaydı işlenmeyecek');
-                    return;
-                }
-
-                if (audioBlob.size === 0) {
-                    console.log('Boş ses kaydı, işlem yapılmayacak');
-                    return;
-                }
-
-                const formData = new FormData();
-                formData.append('audio', audioBlob, 'audio.webm');
-                formData.append('interview_code', interviewCode);
-
-                console.log('Ses kaydı gönderiliyor...');
-                const response = await fetch('/process_audio', {
-                    method: 'POST',
-                    body: formData
-                });
-
-                if (!response.ok) {
-                    const errorText = await response.text();
-                    console.error('Sunucu yanıt detayı:', errorText);
-                    throw new Error(`HTTP error! status: ${response.status}, detail: ${errorText}`);
-                }
-                
-                const data = await response.json();
-                console.log('Sunucu yanıtı:', data);
-                
-                if (data.success) {
-                    if (data.transcript) {
-                        addMessageToChat('user', data.transcript);
-                    }
-                    if (data.response) {
-                        addMessageToChat('assistant', data.response);
-                        await speakResponse(data.response);
-                    }
-                    
-                    if (data.interview_completed) {
-                        interviewEnded = true;
-                        await endInterview();
-                    }
-                } else {
-                    showError(data.error || 'Ses işlenemedi');
-                    
-                    if (!data.continue_listening) {
-                        isAutoMode = false;
-                        updateStatus('Manuel moda geçildi (Space tuşunu kullanın)', 'manual');
-                    }
-                }
-            } catch (error) {
-                console.error('Sunucu hatası:', error);
-                showError('Sunucu ile iletişim hatası: ' + error.message);
-                
-                // Hata durumunda ses sistemini yeniden başlat
-                isMediaRecorderReady = false;
-                if (isAutoMode) {
-                    await initAudio();
-                    startVoiceDetection();
-                }
-            }
-        }
-
-        // WebM'den WAV'a dönüştürme fonksiyonu
-        async function convertToWav(webmBlob) {
-            const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-            const arrayBuffer = await webmBlob.arrayBuffer();
-            const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
-            
-            const numberOfChannels = 1;
-            const length = audioBuffer.length;
-            const sampleRate = 16000;
-            const buffer = audioContext.createBuffer(numberOfChannels, length, sampleRate);
-            
-            // Ses verilerini kopyala
-            const channelData = audioBuffer.getChannelData(0);
-            buffer.copyToChannel(channelData, 0);
-            
-            // WAV formatına dönüştür
-            const wavData = audioBufferToWav(buffer);
-            return new Blob([wavData], { type: 'audio/wav' });
-        }
-
-        // AudioBuffer'ı WAV formatına dönüştürme
-        function audioBufferToWav(buffer) {
-            const numberOfChannels = 1;
-            const sampleRate = 16000;
-            const format = 1; // PCM
-            const bitDepth = 16;
-            
-            const bytesPerSample = bitDepth / 8;
-            const blockAlign = numberOfChannels * bytesPerSample;
-            
-            const buffer32 = new Int32Array(44 + buffer.length * bytesPerSample);
-            const view = new DataView(buffer32.buffer);
-            
-            // WAV header
-            writeString(view, 0, 'RIFF');
-            view.setUint32(4, 36 + buffer.length * bytesPerSample, true);
-            writeString(view, 8, 'WAVE');
-            writeString(view, 12, 'fmt ');
-            view.setUint32(16, 16, true);
-            view.setUint16(20, format, true);
-            view.setUint16(22, numberOfChannels, true);
-            view.setUint32(24, sampleRate, true);
-            view.setUint32(28, sampleRate * blockAlign, true);
-            view.setUint16(32, blockAlign, true);
-            view.setUint16(34, bitDepth, true);
-            writeString(view, 36, 'data');
-            view.setUint32(40, buffer.length * bytesPerSample, true);
-            
-            // Ses verilerini yaz
-            const data = buffer.getChannelData(0);
-            let offset = 44;
-            for (let i = 0; i < data.length; i++, offset += 2) {
-                const sample = Math.max(-1, Math.min(1, data[i]));
-                view.setInt16(offset, sample < 0 ? sample * 0x8000 : sample * 0x7FFF, true);
-            }
-            
-            return buffer32.buffer;
-        }
-
-        function writeString(view, offset, string) {
-            for (let i = 0; i < string.length; i++) {
-                view.setUint8(offset + i, string.charCodeAt(i));
-            }
-        }
-
-        function addMessageToChat(role, message) {
-            const chatContainer = document.getElementById('messages');
-            const messageDiv = document.createElement('div');
-            messageDiv.className = `chat-bubble ${role}-bubble`;
-            messageDiv.textContent = message;
-            chatContainer.appendChild(messageDiv);
-            chatContainer.scrollTop = chatContainer.scrollHeight;
-
-            if (role === 'assistant') {
-                const avatar = document.getElementById('aivaAvatar');
-                avatar.classList.add('speaking');
-                setTimeout(() => avatar.classList.remove('speaking'), 1000);
-            }
-        }
-
-        function showError(message) {
-            // Hata mesajını göster
-            const errorDiv = document.createElement('div');
-            errorDiv.className = 'fixed top-4 right-4 bg-red-500 text-white px-6 py-3 rounded-lg shadow-lg z-50';
-            errorDiv.textContent = message;
-            document.body.appendChild(errorDiv);
-            
-            setTimeout(() => {
-                errorDiv.remove();
-            }, 3000);
-        }
-
-        async function endInterview() {
-            try {
-                await stopAudioSystem();
-                
-                console.log('Mülakat sonlandırma isteği gönderiliyor...');
-                const response = await fetch('/stop_recording', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        interview_code: interviewCode
-                    })
-                });
-                
-                if (!response.ok) {
-                    const errorText = await response.text();
-                    console.error('Sonlandırma yanıt detayı:', errorText);
-                    throw new Error(`HTTP error! status: ${response.status}, detail: ${errorText}`);
-                }
-                
-                const data = await response.json();
-                console.log('Mülakat sonlandırma yanıtı:', data);
-                
-                if (data.success) {
-                    addMessageToChat('assistant', 'Mülakat tamamlandı. Rapor oluşturuluyor...');
-                    
-                    // Raporu indir
-                    if (data.report_url) {
-                        const downloadLink = document.createElement('a');
-                        downloadLink.href = data.report_url;
-                        downloadLink.download = `mulakat_raporu_${new Date().toISOString().slice(0,10)}.pdf`;
-                        downloadLink.click();
-                    }
-                    
-                    // Webhook'a gönder
-                    if (data.report_data) {
-                        await sendReportToWebhook(data.report_data);
-                    }
-                    
-                    showSuccess('Mülakat başarıyla tamamlandı ve rapor oluşturuldu!');
-                    updateStatus('Mülakat tamamlandı', 'completed');
-                    document.getElementById('aivaAvatar').classList.add('completed');
-                    
-                    // Rapor indirme butonu ekle
-                    if (data.report_url) {
-                        addDownloadButton(data.report_url);
-                    }
-                } else {
-                    throw new Error(data.error || 'Rapor oluşturulamadı');
-                }
-                
-            } catch (error) {
-                console.error('Mülakat bitirme hatası:', error);
-                showError('Mülakat sonlandırılırken bir hata oluştu: ' + error.message);
-            }
-        }
-
-        async function sendReportToWebhook(reportData) {
-            try {
-                // Yeni webhook URL'si
-                const webhookUrl = 'https://otomasyon.aivatech.io/api/v1/webhooks/B7iYtwVltWEzX2nvAaWCX';
-                
-                console.log('Webhook\'a gönderilen veri:', reportData);
-                
-                const response = await fetch(webhookUrl, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        interview_data: reportData,
-                        timestamp: new Date().toISOString(),
-                        status: 'completed'
-                    })
-                });
-                
-                if (!response.ok) {
-                    const errorText = await response.text();
-                    throw new Error(`Webhook hatası: ${response.status}, detay: ${errorText}`);
-                }
-                
-                console.log('Rapor webhook\'a başarıyla gönderildi');
-            } catch (error) {
-                console.error('Webhook hatası:', error);
-                showError('Rapor webhook\'a gönderilemedi: ' + error.message);
-            }
-        }
-
-        function addDownloadButton(reportUrl) {
-            const container = document.querySelector('.chat-container');
-            const downloadDiv = document.createElement('div');
-            downloadDiv.className = 'fixed bottom-4 right-4 flex gap-4';
-            
-            const downloadButton = document.createElement('button');
-            downloadButton.className = 'bg-indigo-600 text-white px-6 py-3 rounded-lg shadow-lg hover:bg-indigo-700 transition-colors';
-            downloadButton.innerHTML = '<i class="fas fa-download mr-2"></i>Raporu İndir';
-            downloadButton.onclick = () => {
-                const link = document.createElement('a');
-                link.href = reportUrl;
-                link.download = `mulakat_raporu_${new Date().toISOString().slice(0,10)}.pdf`;
-                link.click();
-            };
-            
-            downloadDiv.appendChild(downloadButton);
-            container.appendChild(downloadDiv);
-        }
-
-        function showSuccess(message) {
-            const successDiv = document.createElement('div');
-            successDiv.className = 'fixed top-4 right-4 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg z-50';
-            successDiv.textContent = message;
-            document.body.appendChild(successDiv);
-            
-            setTimeout(() => {
-                successDiv.remove();
-            }, 5000);
-        }
-
-        // Modal işlemleri için yeni fonksiyonlar
-        function showModal() {
-            document.getElementById('infoModal').style.display = 'flex';
-        }
-
-        function closeModal() {
-            document.getElementById('infoModal').style.display = 'none';
-        }
-
-        // Sayfa yüklendiğinde
-        document.addEventListener('DOMContentLoaded', async () => {
-            // Mülakatı başlat
-            const initialized = await initializeInterview();
-            if (!initialized) {
-                return;
-            }
-
-            // Avatar tıklama - mod değiştirme
-            document.getElementById('aivaAvatar').addEventListener('click', () => {
-                if (!interviewEnded) {
-                    isAutoMode = !isAutoMode;
-                    if (isAutoMode) {
-                        startVoiceDetection();
-                        updateStatus('Otomatik dinleme aktif', 'auto');
-                    } else {
-                        updateStatus('Manuel mod aktif (Space tuşunu kullanın)', 'manual');
-                    }
-                }
-            });
-            
-            // Space tuşu kontrolü
-            document.addEventListener('keydown', (e) => {
-                if (e.code === 'Space' && !isAutoMode) {
-                    e.preventDefault();
-                    if (!isRecording) startRecording();
-                }
-            });
-            
-            document.addEventListener('keyup', (e) => {
-                if (e.code === 'Space' && !isAutoMode) {
-                    e.preventDefault();
-                    if (isRecording) stopRecording();
-                }
-            });
-
-            // Sayfa yüklendiğinde modalı göster
-            showModal();
-        });
-    </script>
-</body>
-</html> 
+    
