@@ -1348,6 +1348,67 @@
                 requestAnimationFrame(checkAudioLevel);
             }
         }
+
+        async function generateReport() {
+            try {
+                showMessage('Rapor oluşturma süreci başlatıldı...', 'info');
+                console.log('Rapor oluşturma isteği gönderiliyor...');
+                
+                const response = await fetch('/generate_report', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        conversation_history: conversationHistory
+                    })
+                });
+
+                const result = await response.json();
+                console.log('Rapor oluşturma yanıtı:', result);
+                
+                if (result.success) {
+                    showMessage(`Rapor başarıyla oluşturuldu! (${result.pdf_path})`, 'success');
+                    console.log('Rapor başarıyla oluşturuldu:', result.pdf_path);
+                    
+                    // Mülakat tamamlandı, avatar'ı güncelle
+                    updateAvatarState('completed');
+                    document.getElementById('aivaAvatar').classList.add('completed');
+                } else {
+                    const errorMessage = result.error || 'Bilinmeyen bir hata oluştu';
+                    showMessage('Rapor oluşturulurken bir hata oluştu: ' + errorMessage, 'error');
+                    console.error('Rapor oluşturma hatası:', errorMessage);
+                }
+            } catch (error) {
+                console.error('Rapor oluşturma hatası:', error);
+                showMessage('Rapor oluşturulurken bir hata oluştu: ' + error.message, 'error');
+            }
+        }
+
+        // Mülakat bittiğinde rapor oluştur
+        function handleInterviewEnd() {
+            showMessage('Mülakat sona erdi. Rapor oluşturuluyor...', 'info');
+            console.log('Mülakat sona erdi, rapor oluşturma başlatılıyor...');
+            generateReport();
+        }
+
+        // Mesaj gösterme fonksiyonunu güncelle
+        function showMessage(message, type = 'info') {
+            console.log(`[${type.toUpperCase()}] ${message}`);
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `fixed top-4 right-4 px-6 py-3 rounded-lg shadow-lg z-50 ${
+                type === 'success' ? 'bg-green-500' :
+                type === 'error' ? 'bg-red-500' :
+                'bg-blue-500'
+            } text-white`;
+            messageDiv.textContent = message;
+            document.body.appendChild(messageDiv);
+            
+            setTimeout(() => {
+                messageDiv.remove();
+            }, 5000);
+        }
+
     </script>
 </body>
 </html> 
