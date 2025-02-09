@@ -1,0 +1,21 @@
+{
+  "code": "E2OWHY6C",
+  "candidate_name": "Test Aday",
+  "email": "test@example.com",
+  "position": "Senior Python Developer",
+  "requirements": [
+    "Python",
+    "Django",
+    "FastAPI",
+    "PostgreSQL"
+  ],
+  "questions": [
+    "Python ile asenkron programlama deneyiminizi anlatır mısınız?",
+    "Mikroservis mimarisi hakkında ne düşünüyorsunuz?",
+    "Test Driven Development yaklaşımını nasıl uyguluyorsunuz?"
+  ],
+  "cv_summary": "8 yıllık Python geliştirici deneyimi, büyük ölçekli projelerde teknik liderlik, açık kaynak katkıları",
+  "pre_info": "Teknik yetkinliği yüksek, iletişimi güçlü, takım çalışmasına yatkın",
+  "created_at": "2025-02-08T19:32:17.428901",
+  "status": "pending"
+}

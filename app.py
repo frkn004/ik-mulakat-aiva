@@ -11,7 +11,7 @@ import asyncio
 import concurrent.futures
 from google.cloud import speech, texttospeech
 import logging
-from flask import Flask, request, jsonify, render_template, redirect, send_from_directory
+from flask import Flask, request, jsonify, render_template, redirect, send_from_directory, Response
 from flask_cors import CORS
 from datetime import datetime, timedelta
 import json
@@ -35,6 +35,10 @@ import sqlite3
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 import secrets
+import aiohttp
+import queue
+import playsound
+from gtts import gTTS
 
 # Flask ve async ayarları
 app = Flask(__name__)
@@ -49,7 +53,7 @@ logger = logging.getLogger(__name__)
 load_dotenv()
 
 # OpenAI istemcisini başlat
-openai_client = OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
+openai_client = OpenAI()
 
 # Doğru yol
 os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = os.path.join(os.path.dirname(__file__), 'google_credentials.json')
@@ -106,38 +110,81 @@ class VoiceAssistant:
             logger.error(f"Google Cloud Text-to-Speech client başlatma hatası: {e}")
             raise
 
+        self.eleven_api_key = os.getenv("ELEVEN_API_KEY")
+        self.voice_id = "21m00Tcm4TlvDq8ikWAM"  # Rachel sesi - değiştirilebilir
+
     def record_audio(self):
         """Ses kaydı yap"""
         logger.debug("Ses kaydı başlıyor...")
         audio_chunks = []
         silence_start = None
         self.is_recording = True
-
-        with sd.InputStream(callback=self.audio_callback,
-                          channels=self.channels,
-                          samplerate=self.sample_rate):
-            while self.is_recording:
-                try:
-                    audio_chunk = self.audio_queue.get(timeout=0.3)
-                    audio_chunks.append(audio_chunk)
-
-                    if np.max(np.abs(audio_chunk)) < self.silence_threshold:
-                        if silence_start is None:
-                            silence_start = time.time()
-                        elif time.time() - silence_start > self.silence_duration:
-                            break
-                    else:
-                        silence_start = None
-                except:
-                    continue
-
+        
+        # Ses algılama parametreleri
+        SILENCE_THRESHOLD = 0.02  # Sessizlik eşiği
+        MIN_AUDIO_LENGTH = 0.3    # Minimum ses süresi (saniye)
+        MAX_SILENCE_LENGTH = 1.5  # Maksimum sessizlik süresi (saniye)
+        BUFFER_SIZE = 1024        # Tampon boyutu
+        
+        try:
+            with sd.InputStream(callback=self.audio_callback,
+                              channels=self.channels,
+                              samplerate=self.sample_rate,
+                              blocksize=BUFFER_SIZE,
+                              device=None):  # Varsayılan ses cihazı
+                
+                last_active_time = time.time()
+                
+                while self.is_recording:
+                    try:
+                        audio_chunk = self.audio_queue.get(timeout=0.1)
+                        current_volume = np.max(np.abs(audio_chunk))
+                        
+                        # Ses algılandı
+                        if current_volume > SILENCE_THRESHOLD:
+                            last_active_time = time.time()
+                            if silence_start is not None:
+                                silence_duration = time.time() - silence_start
+                                if silence_duration > MAX_SILENCE_LENGTH:
+                                    audio_chunks = []  # Tampon temizlenir
+                                silence_start = None
+                            audio_chunks.append(audio_chunk)
+                        # Sessizlik algılandı
+                        else:
+                            if silence_start is None:
+                                silence_start = time.time()
+                            elif time.time() - silence_start > MAX_SILENCE_LENGTH:
+                                # Yeterli uzunlukta ses kaydı varsa bitir
+                                if len(audio_chunks) * (BUFFER_SIZE / self.sample_rate) >= MIN_AUDIO_LENGTH:
+                                    break
+                            
+                        # Uzun süre ses algılanmazsa kaydı durdur
+                        if time.time() - last_active_time > 5:  # 5 saniye sessizlik
+                            if len(audio_chunks) > 0:
+                                break
+                            else:
+                                audio_chunks = []  # Tampon temizle
+                                last_active_time = time.time()  # Zamanı sıfırla
+                                
+                    except queue.Empty:
+                        continue
+                        
+        except Exception as e:
+            logger.error(f"Ses kaydı hatası: {str(e)}")
+            return None
+            
         logger.debug("Ses kaydı tamamlandı")
         return np.concatenate(audio_chunks) if audio_chunks else None
 
     def audio_callback(self, indata, frames, time, status):
+        """Ses verisi callback fonksiyonu"""
         if status:
             logger.warning(f"Ses kaydı durum: {status}")
-        self.audio_queue.put(indata.copy())
+        try:
+            self.audio_queue.put(indata.copy())
+        except queue.Full:
+            self.audio_queue.get_nowait()  # En eski veriyi at
+            self.audio_queue.put(indata.copy())
 
     def save_audio(self, recording, filename='temp_recording.wav'):
         logger.debug(f"Ses kaydı kaydediliyor: {filename}")
@@ -188,52 +235,93 @@ class VoiceAssistant:
             return None
 
     async def generate_and_play_speech(self, text):
-        """Google TTS ile yanıtı seslendir"""
+        """
+        Metni Eleven Labs API kullanarak sese çevirir
+        """
         try:
-            logger.debug("Google TTS ile ses üretimi başlıyor...")
-
-            synthesis_input = texttospeech.SynthesisInput(text=text)
-            voice = texttospeech.VoiceSelectionParams(
-                language_code="tr-TR",
-                name="tr-TR-Standard-A",
-                ssml_gender=texttospeech.SsmlVoiceGender.FEMALE
-            )
-            audio_config = texttospeech.AudioConfig(
-                audio_encoding=texttospeech.AudioEncoding.LINEAR16,
-                speaking_rate=1.0,
-                pitch=0,
-                volume_gain_db=0.0
-            )
-
-            response = await asyncio.get_event_loop().run_in_executor(
-                self.executor,
-                lambda: self.tts_client.synthesize_speech(
-                    input=synthesis_input,
-                    voice=voice,
-                    audio_config=audio_config
-                )
-            )
-
-            with open("temp_response.wav", "wb") as out:
-                out.write(response.audio_content)
-
-            data, fs = sf.read("temp_response.wav")
-            sd.play(data, fs)
-            sd.wait()
-
-            os.remove("temp_response.wav")
-
-            logger.debug("Google TTS ses üretimi ve oynatma başarılı")
+            if not text:
+                return
+                
+            # GPT konuşma durumunu güncelle
+            interview_data['is_gpt_speaking'] = True
+                
+            # Eleven Labs API endpoint
+            url = f"https://api.elevenlabs.io/v1/text-to-speech/{self.voice_id}/stream"
+            
+            headers = {
+                "Accept": "audio/mpeg",
+                "Content-Type": "application/json",
+                "xi-api-key": self.eleven_api_key
+            }
+            
+            data = {
+                "text": text,
+                "model_id": "eleven_multilingual_v2",
+                "voice_settings": {
+                    "stability": 0.75,
+                    "similarity_boost": 0.75,
+                    "style": 0.5,
+                    "use_speaker_boost": True
+                }
+            }
+            
+            try:
+                async with aiohttp.ClientSession() as session:
+                    async with session.post(url, json=data, headers=headers) as response:
+                        if response.status == 200:
+                            # Ses akışını al
+                            audio_stream = await response.read()
+                            
+                            # Geçici ses dosyasını kaydet
+                            temp_file = "temp_speech.mp3"
+                            with open(temp_file, "wb") as f:
+                                f.write(audio_stream)
+                            
+                            # Ses dosyasını çal
+                            playsound.playsound(temp_file)
+                            
+                            # Geçici dosyayı sil
+                            if os.path.exists(temp_file):
+                                os.remove(temp_file)
+                        else:
+                            logger.error(f"Eleven Labs API Hatası: {response.status}")
+                            await self._fallback_tts(text)
+            except Exception as e:
+                logger.error(f"Eleven Labs bağlantı hatası: {str(e)}")
+                await self._fallback_tts(text)
+                        
         except Exception as e:
-            logger.error(f"Google TTS ses üretme hatası: {str(e)}")
+            logger.error(f"Ses üretme hatası: {str(e)}")
+            await self._fallback_tts(text)
+        finally:
+            # GPT konuşma durumunu güncelle
+            interview_data['is_gpt_speaking'] = False
+            
+    async def _fallback_tts(self, text):
+        """
+        Yedek TTS sistemi (gTTS kullanarak)
+        """
+        try:
+            logger.info("Yedek TTS sistemi kullanılıyor...")
+            tts = gTTS(text=text, lang='tr')
+            temp_file = "temp_speech.mp3"
+            tts.save(temp_file)
+            playsound.playsound(temp_file)
+            if os.path.exists(temp_file):
+                os.remove(temp_file)
+        except Exception as e:
+            logger.error(f"Yedek TTS hatası: {str(e)}")
 
 class InterviewAssistant(VoiceAssistant):
     def __init__(self):
         super().__init__()
+        self.code = None
         self.candidate_name = ""
         self.position = ""
         self.requirements = []
         self.custom_questions = []
+        self.cv_summary = ""
+        self.pre_info = ""
         self.conversation_history = []
         self.sentiment_scores = []
         self.metrics = {
@@ -247,18 +335,34 @@ class InterviewAssistant(VoiceAssistant):
         self.interview_questions = []
 
     def set_interview_details(self, code):
-        """Mülakat detaylarını ayarla"""
-        if code not in interview_data:
-            raise ValueError("Geçersiz mülakat kodu")
+        """Mülakat detaylarını JSON dosyasından ayarla"""
+        try:
+            # JSON dosyasından mülakat bilgilerini oku
+            json_path = os.path.join('interviews', f'{code}.json')
+            if not os.path.exists(json_path):
+                raise ValueError(f"Mülakat dosyası bulunamadı: {code}")
 
-        interview = interview_data[code]
-        self.candidate_name = interview["candidate_info"]["name"]
-        self.position = interview["candidate_info"]["position"]
-        self.requirements = interview["candidate_info"]["requirements"]
-        self.custom_questions = interview["candidate_info"]["custom_questions"]
-        
-        # Soruları hazırla
-        self._prepare_interview_questions()
+            with open(json_path, 'r', encoding='utf-8') as f:
+                interview_data = json.load(f)
+
+            # Mülakat bilgilerini ayarla
+            self.code = code
+            self.candidate_name = interview_data.get("candidate_name", "")
+            self.position = interview_data.get("position", "")
+            self.requirements = interview_data.get("requirements", [])
+            self.custom_questions = interview_data.get("questions", [])
+            self.cv_summary = interview_data.get("cv_summary", "")
+            self.pre_info = interview_data.get("pre_info", "")
+
+            # Soruları hazırla
+            self._prepare_interview_questions()
+
+            logger.info(f"Mülakat detayları ayarlandı: {code}")
+            return True
+
+        except Exception as e:
+            logger.error(f"Mülakat detayları ayarlama hatası: {str(e)}")
+            raise
 
     def _prepare_interview_questions(self):
         """Özelleştirilmiş mülakat sorularını hazırla"""
@@ -266,8 +370,15 @@ class InterviewAssistant(VoiceAssistant):
             # Özel soruları kullan
             self.interview_questions = self.custom_questions
 
-            # Hoşgeldin mesajını ekle
-            welcome_message = f"Merhaba {self.candidate_name}, {self.position} pozisyonu için mülakatımıza hoş geldiniz."
+            # Hoşgeldin mesajını hazırla
+            welcome_message = f"""Merhaba {self.candidate_name}, {self.position} pozisyonu için mülakatımıza hoş geldiniz. 
+            
+            Özgeçmişinizde belirttiğiniz {self.cv_summary} bilgilerine dayanarak, pozisyonun gerektirdiği {', '.join(self.requirements)} yetkinlikleri hakkında konuşacağız.
+            
+            {self.pre_info if self.pre_info else ''}
+            
+            Başlamak için hazır mısınız?"""
+
             self.conversation_history.append({
                 "role": "assistant",
                 "content": welcome_message
@@ -298,35 +409,49 @@ class InterviewAssistant(VoiceAssistant):
             if not text:
                 logger.warning("Boş metin için GPT yanıtı istenemez")
                 return None
-                
+
             # Konuşma geçmişini güncelle
             self.conversation_history.append({"role": "user", "content": text})
+            
+            # Cevabı değerlendir ve metrikleri güncelle
+            await self._analyze_sentiment(text)
             
             # Mülakat tamamlandı mı kontrol et
             if self.current_question_index >= len(self.interview_questions):
                 # Mülakat bitti, son mesajı gönder
-                final_message = "Mülakat sona erdi. Katılımınız için teşekkür ederiz. Raporunuz hazırlanıyor..."
+                final_message = """Mülakat sona erdi. Katılımınız için teşekkür ederiz. 
+                Değerlendirme raporunuz hazırlanıyor..."""
+                
                 self.conversation_history.append({"role": "assistant", "content": final_message})
                 
                 # PDF raporu oluştur
                 pdf_path = self.generate_pdf_report()
+                
+                # Değerlendirme verilerini hazırla
+                evaluation_data = {
+                    "teknik_yetkinlik": self.metrics["teknik_bilgi"],
+                    "iletisim_becerileri": self.metrics["iletisim_puani"],
+                    "ozguven": self.metrics["ozguven_puani"],
+                    "genel_puan": self.metrics["genel_puan"],
+                    "guclu_yonler": [],
+                    "gelistirilmesi_gereken_yonler": [],
+                    "genel_degerlendirme": ""
+                }
+                
                 if pdf_path:
-                    # Raporu e-posta ile gönder
-                    self.send_report_email(pdf_path)
-                    # Webhook'a gönder
-                    self.send_report_webhook(pdf_path)
+                    # Raporu webhook'a gönder
+                    await self.send_report_webhook(pdf_path, evaluation_data)
                     
-                return final_message
+                return final_message, True  # True -> Mülakat bitti
             
             # Bir sonraki soruyu hazırla
             next_question = self.interview_questions[self.current_question_index]
             self.current_question_index += 1
             
-            # Yanıtı kaydet ve bir sonraki soruyu sor
-            response = next_question
-            self.conversation_history.append({"role": "assistant", "content": response})
+            # Soruyu kaydet ve gönder
+            self.conversation_history.append({"role": "assistant", "content": next_question})
             
-            return response
+            return next_question, False  # False -> Mülakat devam ediyor
             
         except Exception as e:
             logger.error(f"GPT yanıt hatası: {str(e)}")
@@ -335,29 +460,31 @@ class InterviewAssistant(VoiceAssistant):
     async def _analyze_sentiment(self, text):
         """Metni analiz et ve metrikleri güncelle"""
         try:
+            # Analiz promptu
             sentiment_prompt = f"""
-            Lütfen aşağıdaki metni analiz et ve şu metrikleri 0-100 arası puanla:
-            Metin: "{text}"
+            Lütfen aşağıdaki cevabı analiz et ve şu metrikleri 0-100 arası puanla:
+            
+            Pozisyon: {self.position}
+            Soru: {self.interview_questions[self.current_question_index-1]}
+            Cevap: "{text}"
             
             Şu formatta JSON yanıt ver:
             {{
                 "iletisim_becerisi": [puan],
                 "ozguven": [puan],
-                "teknik_bilgi": [puan]
+                "teknik_bilgi": [puan],
+                "yorum": "[kısa değerlendirme]"
             }}
             """
             
-            response = await asyncio.get_event_loop().run_in_executor(
-                self.executor,
-                lambda: self.openai_client.chat.completions.create(
-                    model="gpt-4",
-                    messages=[
-                        {"role": "system", "content": "Sen bir mülakat değerlendirme uzmanısın."},
-                        {"role": "user", "content": sentiment_prompt}
-                    ],
-                    temperature=0.3,
-                    max_tokens=150
-                )
+            response = await openai_client.chat.completions.create(
+                model="gpt-4",
+                messages=[
+                    {"role": "system", "content": "Sen bir kıdemli yazılım mühendisi ve mülakat uzmanısın."},
+                    {"role": "user", "content": sentiment_prompt}
+                ],
+                temperature=0.3,
+                max_tokens=150
             )
             
             # JSON yanıtı parse et
@@ -367,19 +494,18 @@ class InterviewAssistant(VoiceAssistant):
             self.sentiment_scores.append(analysis)
             
             # Ortalama puanları hesapla
+            total_scores = len(self.sentiment_scores)
             self.metrics = {
-                "iletisim_puani": sum(s["iletisim_becerisi"] for s in self.sentiment_scores) / len(self.sentiment_scores),
-                "ozguven_puani": sum(s["ozguven"] for s in self.sentiment_scores) / len(self.sentiment_scores),
-                "teknik_bilgi": sum(s["teknik_bilgi"] for s in self.sentiment_scores) / len(self.sentiment_scores)
+                "iletisim_puani": sum(s["iletisim_becerisi"] for s in self.sentiment_scores) / total_scores,
+                "ozguven_puani": sum(s["ozguven"] for s in self.sentiment_scores) / total_scores,
+                "teknik_bilgi": sum(s["teknik_bilgi"] for s in self.sentiment_scores) / total_scores
             }
             self.metrics["genel_puan"] = sum(self.metrics.values()) / 3
             
             logger.debug(f"Metrikler güncellendi: {self.metrics}")
-            return None
             
         except Exception as e:
             logger.error(f"Duygu analizi hatası: {str(e)}")
-            return None
 
     async def process_interview_response(self, text):
         """Mülakat yanıtını işle ve değerlendir"""
@@ -434,8 +560,8 @@ class InterviewAssistant(VoiceAssistant):
                 fontSize=12,
                 spaceAfter=6
             )
-            story.append(Paragraph(f"Aday: {self.candidate_name}", info_style))
-            story.append(Paragraph(f"Pozisyon: {self.position}", info_style))
+            story.append(Paragraph(f"Aday: {self.candidate_name if current_interview else 'Bilinmiyor'}", info_style))
+            story.append(Paragraph(f"Pozisyon: {self.position if current_interview else 'Bilinmiyor'}", info_style))
             story.append(Paragraph(f"Tarih: {self.start_time.strftime('%d.%m.%Y %H:%M')}", info_style))
             story.append(Spacer(1, 20))
             
@@ -535,40 +661,49 @@ class InterviewAssistant(VoiceAssistant):
             print(f"E-posta gönderme hatası: {str(e)}")
             return False
 
-    def send_report_webhook(self, pdf_path):
+    def send_report_webhook(self, pdf_path, evaluation_data):
+        """Raporu webhook'a gönder"""
         try:
-            # Konuşma geçmişini düzgün şekilde hazırla
-            conversation_flow = []
-            for entry in self.conversation_history:
-                conversation_flow.append({
-                    "soru_cevap": entry["content"] if entry["role"] == "user" else "",
-                    "degerlendirme": entry["content"] if entry["role"] == "assistant" else ""
-                })
-                
-                # Webhook verisi
-                webhook_data = {
-                    "aday_bilgileri": {
-                        "isim": self.candidate_name,
-                        "pozisyon": self.position,
-                        "tarih": self.start_time.strftime('%d.%m.%Y %H:%M')
-                    },
-                    "metrikler": self.metrics,
-                    "konusma_akisi": conversation_flow
-                }
-                
-            # Webhook isteği gönder
+            # Mülakat verilerini hazırla
+            interview_summary = {
+                "mulakat_kodu": self.code,
+                "aday_bilgileri": {
+                    "isim": self.candidate_name,
+                    "pozisyon": self.position,
+                    "cv_ozeti": self.cv_summary,
+                    "on_bilgi": self.pre_info,
+                    "gereksinimler": self.requirements,
+                    "tarih": self.start_time.isoformat()
+                },
+                "mulakat_metrikleri": {
+                    "iletisim_puani": self.metrics["iletisim_puani"],
+                    "ozguven_puani": self.metrics["ozguven_puani"],
+                    "teknik_bilgi": self.metrics["teknik_bilgi"],
+                    "genel_puan": self.metrics["genel_puan"]
+                },
+                "degerlendirme": evaluation_data,
+                "konusma_akisi": self.conversation_history,
+                "rapor_dosyasi": pdf_path,
+                "olusturulma_tarihi": datetime.now().isoformat()
+            }
+            
+            # WebhookRapor'a gönder
             response = requests.post(
-                WEBHOOK_ADAY_URL,
-                json=webhook_data,
-                headers={'Content-Type': 'application/json'}
+                WEBHOOK_RAPOR_URL,
+                json=interview_summary,
+                headers={
+                    'Content-Type': 'application/json',
+                    'X-Interview-Code': self.code
+                }
             )
             
-            if response.status_code != 200:
+            if response.status_code == 200:
+                logger.info(f"Rapor webhook'a başarıyla gönderildi: {self.code}")
+                return True
+            else:
                 logger.error(f"Webhook hatası: {response.status_code} - {response.text}")
                 return False
                 
-            return True
-            
         except Exception as e:
             logger.error(f"Webhook gönderme hatası: {str(e)}")
             return False
@@ -652,17 +787,22 @@ def create_interview():
         try:
             # GPT ile pozisyona özel sorular oluştur
             prompt = f"""
-            {position} pozisyonu için mülakat soruları oluştur.
+            {position} pozisyonu için ön görüşme soruları oluştur.
             
             Aday Bilgileri:
             - İsim: {candidate_name}
             - Pozisyon: {position}
             
-            Lütfen aşağıdaki kriterlere göre 5-7 arası soru oluştur:
-            1. Teknik yetkinlikler
-            2. Problem çözme becerileri
-            3. İş deneyimi
-            4. Pozisyona özel gereksinimler
+            Lütfen aşağıdaki kriterlere göre 3-4 arası kısa ve öz soru oluştur:
+            1. Genel deneyim ve beklentiler
+            2. Pozisyona ilgi ve motivasyon
+            3. Temel teknik bilgi seviyesi
+            
+            Önemli Notlar:
+            - Bu bir ön görüşmedir, detaylı teknik sorular sormayın
+            - Her soru kısa ve öz olmalı
+            - Adayın genel profilini anlamaya odaklanın
+            - Cevapları çok detaylı değerlendirmeyin, bir sonraki soruya geçin
             
             Soruları liste formatında ver ve her soru Türkçe olsun.
             """
@@ -800,6 +940,7 @@ def verify_code():
                     "expires_at": (datetime.now() + timedelta(hours=24)).isoformat(),
                     "status": "active"
                 }
+                
                 return jsonify({'success': True})
                 
             return jsonify({
@@ -901,211 +1042,197 @@ async def start_recording():
 @app.route('/process_audio', methods=['POST'])
 async def process_audio():
     try:
-        if 'audio' not in request.files:
+        # GPT konuşuyorsa ses kaydını işleme
+        if interview_data.get('is_gpt_speaking', False):
+            return jsonify({
+                'success': False,
+                'error': 'GPT konuşurken ses kaydı alınamaz',
+                'continue_listening': True
+            })
+            
+        interview_code = request.form.get('interview_code')
+        if not interview_code:
+            return jsonify({
+                'success': False,
+                'error': 'Mülakat kodu gerekli'
+            })
+            
+        # Ses dosyasını al
+        audio_file = request.files.get('audio')
+        if not audio_file:
+            return jsonify({
+                'success': False,
+                'error': 'Ses dosyası bulunamadı'
+            })
+            
+        # JSON dosyasından mülakat verilerini al
+        json_path = os.path.join('interviews', f'{interview_code}.json')
+        if not os.path.exists(json_path):
             return jsonify({
                 "success": False,
-                "error": "Ses dosyası bulunamadı",
+                "error": "Mülakat bilgileri bulunamadı",
                 "continue_listening": True
-            }), 400
+            }), 404
             
-        audio_file = request.files['audio']
+        with open(json_path, 'r', encoding='utf-8') as f:
+            interview_data = json.load(f)
+
+        # Geçici dizini kontrol et ve oluştur
+        temp_dir = os.path.join(os.getcwd(), 'temp')
+        os.makedirs(temp_dir, exist_ok=True)
+            
+        # Benzersiz dosya isimleri oluştur
+        timestamp = str(time.time()).replace('.', '_')
+        temp_webm = os.path.join(temp_dir, f'audio_{timestamp}.webm')
+        temp_wav = os.path.join(temp_dir, f'audio_{timestamp}.wav')
         
-        # Geçici dosya yolu oluştur
-        temp_dir = 'temp'
-        if not os.path.exists(temp_dir):
-            os.makedirs(temp_dir)
-            
-        temp_path = os.path.join(temp_dir, f'temp_audio_{time.time()}.wav')
-        webm_path = temp_path + '.webm'
+        temp_files = [temp_webm, temp_wav]
         
         try:
             # WebM dosyasını kaydet
-            audio_file.save(webm_path)
+            audio_file.save(temp_webm)
+            logger.info(f"WebM dosyası kaydedildi: {temp_webm}")
             
-            # FFmpeg komutu
+            if not os.path.exists(temp_webm):
+                raise FileNotFoundError(f"WebM dosyası oluşturulamadı: {temp_webm}")
+            
+            # FFmpeg ile WAV'a dönüştür
             ffmpeg_command = [
                 'ffmpeg', '-y',
-                '-i', webm_path,
+                '-i', temp_webm,
                 '-acodec', 'pcm_s16le',
                 '-ac', '1',
                 '-ar', '16000',
-                temp_path
+                temp_wav
             ]
             
-            subprocess.run(ffmpeg_command, check=True, capture_output=True)
+            # FFmpeg işlemini çalıştır
+            process = await asyncio.create_subprocess_exec(
+                *ffmpeg_command,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE
+            )
             
-            # Ses seviyesi analizi
-            data, _ = sf.read(temp_path)
+            stdout, stderr = await process.communicate()
+            
+            if process.returncode != 0:
+                raise Exception(f"FFmpeg hatası: {stderr.decode()}")
+            
+            if not os.path.exists(temp_wav):
+                raise FileNotFoundError(f"WAV dosyası oluşturulamadı: {temp_wav}")
+            
+            # Ses seviyesi kontrolü
+            data, _ = sf.read(temp_wav)
             volume_level = float(np.max(np.abs(data))) * 100
             
-            # Sessizlik kontrolü - daha toleranslı
-            if volume_level < SILENCE_THRESHOLD / 2:  # Eşiği yarıya indirdik
-                logger.warning(f"Ses seviyesi düşük: {volume_level}")
+            if volume_level < SILENCE_THRESHOLD:
                 return jsonify({
                     "success": False,
                     "error": "Ses seviyesi çok düşük, lütfen daha yüksek sesle konuşun",
                     "continue_listening": True,
                     "should_restart": True
-                }), 200  # 400 yerine 200 dönüyoruz
+                })
+            
+            # Google Speech client
+            client = speech.SpeechClient()
+            
+            with open(temp_wav, 'rb') as audio_file:
+                content = audio_file.read()
+            
+            audio = speech.RecognitionAudio(content=content)
+            config = speech.RecognitionConfig(
+                encoding=speech.RecognitionConfig.AudioEncoding.LINEAR16,
+                sample_rate_hertz=16000,
+                language_code="tr-TR",
+                enable_automatic_punctuation=True,
+                use_enhanced=True,
+                audio_channel_count=1,
+                enable_separate_recognition_per_channel=False,
+                speech_contexts=[{
+                    "phrases": ["merhaba", "evet", "hayır", "tamam", "anladım"],
+                    "boost": 20.0
+                }],
+                profanity_filter=False,  # Sansürlemeyi kapat
+                enable_word_time_offsets=False  # Zaman damgalarına gerek yok
+            )
+            
+            # Ses tanıma işlemi
+            response = await asyncio.get_event_loop().run_in_executor(
+                None,
+                lambda: client.recognize(config=config, audio=audio)
+            )
+            
+            if not response.results:
+                return jsonify({
+                    "success": False,
+                    "error": "Ses tanınamadı, lütfen tekrar konuşun",
+                    "continue_listening": True,
+                    "should_restart": True
+                })
+            
+            transcript = response.results[0].alternatives[0].transcript
+            confidence = response.results[0].alternatives[0].confidence
 
-            try:
-                # Google Speech client
-                client = speech.SpeechClient()
-                
-                with open(temp_path, 'rb') as audio_file:
-                    content = audio_file.read()
-                
-                # Ses tanıma yapılandırması - daha toleranslı
-                audio = speech.RecognitionAudio(content=content)
-                config = speech.RecognitionConfig(
-                    encoding=speech.RecognitionConfig.AudioEncoding.LINEAR16,
-                    sample_rate_hertz=16000,
-                    language_code="tr-TR",
-                    enable_automatic_punctuation=True,
-                    use_enhanced=True,
-                    audio_channel_count=1,
-                    enable_word_time_offsets=True,
-                    enable_word_confidence=True,
-                    model="command_and_search",  # Daha kısa cümleler için optimize
-                    profanity_filter=False
-                )
-                
-                # Ses tanıma işlemi
-                response = await asyncio.get_event_loop().run_in_executor(
-                    None,
-                    lambda: client.recognize(config=config, audio=audio)
-                )
-                
-                if not response.results:
-                    logger.warning("Ses tanınamadı - Sonuç boş")
-                    return jsonify({
-                        "success": False,
-                        "error": "Ses tanınamadı, lütfen tekrar konuşun",
-                        "continue_listening": True,
-                        "should_restart": True
-                    }), 200  # 400 yerine 200 dönüyoruz
+            # Realtime chat endpoint'ine yönlendir
+            async with aiohttp.ClientSession() as session:
+                async with session.post(
+                    f"{request.host_url}realtime_chat",
+                    json={
+                        "message": transcript,
+                        "session_id": "audio_session",
+                        "interview_code": interview_code
+                    }
+                ) as chat_response:
+                    chat_data = await chat_response.json()
                     
-                transcript = response.results[0].alternatives[0].transcript
-                confidence = response.results[0].alternatives[0].confidence
-                
-                logger.info(f"Tanınan metin: {transcript} (Güven: {confidence:.2f})")
-                
-                # Güven skoru kontrolü - daha toleranslı
-                if confidence < MIN_CONFIDENCE / 2:  # Eşiği yarıya indirdik
-                    return jsonify({
-                        "success": False,
-                        "error": "Ses net anlaşılamadı, lütfen tekrar konuşun",
-                        "continue_listening": True,
-                        "should_restart": True,
-                        "transcript": transcript,  # Transcript'i de gönderelim
-                        "confidence": confidence
-                    }), 200  # 400 yerine 200 dönüyoruz
-                
-                # Mülakat sona erdiğinde rapor oluştur
-                if "Mülakat sona erdi" in response.results[0].alternatives[0].transcript:
-                    logger.info("Mülakat sona erdi, rapor oluşturma başlatılıyor...")
-                    try:
-                        # PDF raporu oluştur
-                        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                        pdf_path = os.path.join('reports', f"mulakat_raporu_{timestamp}.pdf")
-                        
-                        logger.info(f"Rapor dosyası oluşturuluyor: {pdf_path}")
-                        
-                        # Webhook'a gönder
-                        webhook_data = {
-                            "mulakat_kodu": current_interview.code if current_interview else "UNKNOWN",
-                            "aday_bilgileri": {
-                                "isim": current_interview.candidate_name if current_interview else "Bilinmiyor",
-                                "pozisyon": current_interview.position if current_interview else "Bilinmiyor",
-                                "tarih": datetime.now().isoformat()
-                            },
-                            "rapor_dosyasi": pdf_path
-                        }
-                        
-                        try:
-                            logger.info("Rapor webhook'a gönderiliyor...")
-                            response = requests.post(
-                                WEBHOOK_ADAY_URL,
-                                json=webhook_data,
-                                headers={'Content-Type': 'application/json'}
-                            )
-                            
-                            if response.status_code == 200:
-                                logger.info("Rapor webhook'a başarıyla gönderildi")
-                            else:
-                                logger.error(f"Webhook hatası: {response.status_code} - {response.text}")
-                        except Exception as e:
-                            logger.error(f"Webhook gönderme hatası: {str(e)}")
-                        
-                        return jsonify({
-                            "success": True,
-                            "message": "Mülakat tamamlandı ve rapor oluşturuldu",
-                            "pdf_path": pdf_path
-                        })
-                        
-                    except Exception as e:
-                        logger.error(f"Rapor oluşturma hatası: {str(e)}")
+                    if not chat_data.get('success'):
                         return jsonify({
                             "success": False,
-                            "error": "Rapor oluşturulamadı: " + str(e)
+                            "error": chat_data.get('error', 'GPT yanıt hatası'),
+                            "continue_listening": True
                         }), 500
-                
-                # GPT yanıtı al
-                if current_interview:
-                    # GPT yanıtını hemen al
-                    gpt_response = await current_interview.get_gpt_response(transcript)
-                    
-                    # Analizi arka planda yap
-                    asyncio.create_task(current_interview._analyze_sentiment(transcript))
                     
                     return jsonify({
                         "success": True,
                         "transcript": transcript,
-                        "response": gpt_response,
-                        "metrics": current_interview.metrics,
-                        "continue_listening": True,
-                        "confidence": confidence
+                        "response": chat_data.get("text", ""),
+                        "confidence": confidence,
+                        "interview_ended": chat_data.get("interview_ended", False)
                     })
-                else:
-                    return jsonify({
-                        "success": False,
-                        "error": "Mülakat henüz başlatılmadı",
-                        "continue_listening": False
-                    }), 200  # 400 yerine 200 dönüyoruz
-                    
-            except Exception as e:
-                logger.error(f"Ses tanıma hatası: {str(e)}")
-                return jsonify({
-                    "success": False,
-                    "error": "Ses tanıma hatası: " + str(e),
-                    "continue_listening": True,
-                    "should_restart": True
-                }), 200  # 400 yerine 200 dönüyoruz
-            finally:
-                # Geçici dosyaları temizle
-                for file_path in [webm_path, temp_path]:
-                    if os.path.exists(file_path):
-                        try:
-                            os.remove(file_path)
-                        except Exception as e:
-                            logger.error(f"Dosya silme hatası ({file_path}): {str(e)}")
-                
+            
+        except FileNotFoundError as e:
+            logger.error(f"Dosya bulunamadı hatası: {str(e)}")
+            return jsonify({
+                "success": False,
+                "error": f"Dosya bulunamadı: {str(e)}",
+                "continue_listening": True
+            }), 500
+            
         except Exception as e:
-            logger.error(f"Genel hata: {str(e)}")
+            logger.error(f"Ses işleme hatası: {str(e)}")
             return jsonify({
                 "success": False,
                 "error": str(e),
-                "continue_listening": True,
-                "should_restart": True
-            }), 200  # 400 yerine 200 dönüyoruz
+                "continue_listening": True
+            }), 500
+            
     except Exception as e:
-        logger.error(f"Ses işleme hatası: {str(e)}")
+        logger.error(f"Genel hata: {str(e)}")
         return jsonify({
             "success": False,
-            "error": "Ses işleme hatası: " + str(e),
-            "continue_listening": True,
-            "should_restart": True
-        }), 200  # 400 yerine 200 dönüyoruz
+            "error": str(e),
+            "continue_listening": True
+        }), 500
+        
+    finally:
+        # Geçici dosyaları temizle
+        for file_path in temp_files:
+            try:
+                if os.path.exists(file_path):
+                    os.remove(file_path)
+                    logger.debug(f"Geçici dosya silindi: {file_path}")
+            except Exception as e:
+                logger.error(f"Dosya silme hatası ({file_path}): {str(e)}")
 
 @app.route('/generate_report', methods=['POST'])
 async def generate_report():
@@ -1384,8 +1511,10 @@ def create_or_get_interview_code(email):
                 break
         
         # Yeni kodu kaydet
-        conn.execute('INSERT INTO interview_codes (email, code, created_at) VALUES (?, ?, ?)',
-                    (email, code, datetime.now().isoformat()))
+        conn.execute(
+            'INSERT INTO interview_codes (email, code, created_at) VALUES (?, ?, ?)',
+            (email, code, datetime.now().isoformat())
+        )
         conn.commit()
         return code
     finally:
@@ -1488,33 +1617,48 @@ def webhook_aday_handler():
 def send_report_webhook(pdf_path, evaluation_data):
     """Raporu webhook'a gönder"""
     try:
-        webhook_data = {
-            "mulakat_kodu": current_interview.code if current_interview else "UNKNOWN",
+        # Mülakat verilerini hazırla
+        interview_summary = {
+            "mulakat_kodu": current_interview.code,
             "aday_bilgileri": {
-                "isim": current_interview.candidate_name if current_interview else "Bilinmiyor",
-                "pozisyon": current_interview.position if current_interview else "Bilinmiyor",
-                "tarih": datetime.now().isoformat()
+                "isim": current_interview.candidate_name,
+                "pozisyon": current_interview.position,
+                "cv_ozeti": current_interview.cv_summary,
+                "on_bilgi": current_interview.pre_info,
+                "gereksinimler": current_interview.requirements,
+                "tarih": current_interview.start_time.isoformat()
+            },
+            "mulakat_metrikleri": {
+                "iletisim_puani": current_interview.metrics["iletisim_puani"],
+                "ozguven_puani": current_interview.metrics["ozguven_puani"],
+                "teknik_bilgi": current_interview.metrics["teknik_bilgi"],
+                "genel_puan": current_interview.metrics["genel_puan"]
             },
             "degerlendirme": evaluation_data,
-            "rapor_dosyasi": pdf_path
+            "konusma_akisi": current_interview.conversation_history,
+            "rapor_dosyasi": pdf_path,
+            "olusturulma_tarihi": datetime.now().isoformat()
         }
         
         # WebhookRapor'a gönder
         response = requests.post(
             WEBHOOK_RAPOR_URL,
-            json=webhook_data,
-            headers={'Content-Type': 'application/json'}
+            json=interview_summary,
+            headers={
+                'Content-Type': 'application/json',
+                'X-Interview-Code': current_interview.code
+            }
         )
         
         if response.status_code == 200:
-            logger.info("Rapor WebhookRapor'a başarıyla gönderildi")
+            logger.info(f"Rapor webhook'a başarıyla gönderildi: {current_interview.code}")
             return True
         else:
-            logger.error(f"WebhookRapor hatası: {response.status_code} - {response.text}")
+            logger.error(f"Webhook hatası: {response.status_code} - {response.text}")
             return False
-            
+                
     except Exception as e:
-        logger.error(f"WebhookRapor gönderme hatası: {str(e)}")
+        logger.error(f"Webhook gönderme hatası: {str(e)}")
         return False
 
 @app.route('/reports/<path:filename>')
@@ -1573,6 +1717,444 @@ def start_file_watcher():
         print(f"\n[!] Dosya izleme sistemi başlatılamadı: {str(e)}")
         return None
 
+async def get_realtime_token():
+    """OpenAI API anahtarını döndür"""
+    try:
+        api_key = os.getenv('OPENAI_API_KEY')
+        if not api_key:
+            logger.error("OPENAI_API_KEY bulunamadı")
+            return None
+            
+        return api_key
+                
+    except Exception as e:
+        logger.error(f"Token alma hatası: {str(e)}")
+        return None
+
+@app.route('/get_interview_token', methods=['POST'])
+async def get_interview_token():
+    try:
+        data = request.get_json()
+        interview_code = data.get('code')
+        
+        if not interview_code:
+            return jsonify({
+                'success': False,
+                'error': 'Mülakat kodu gerekli'
+            })
+            
+        token = await get_realtime_token()
+        if not token:
+            return jsonify({
+                'success': False,
+                'error': 'Token alınamadı'
+            })
+            
+        # Benzersiz bir session_id oluştur
+        session_id = secrets.token_urlsafe(16)
+            
+        return jsonify({
+            'success': True,
+            'token': token,
+            'session_id': session_id
+        })
+        
+    except Exception as e:
+        logger.error(f"Mülakat token hatası: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': 'Token alınırken bir hata oluştu'
+        })
+
+@app.route('/realtime_chat', methods=['POST'])
+async def realtime_chat():
+    try:
+        data = request.get_json()
+        message = data.get('message')
+        session_id = data.get('session_id')
+        interview_code = data.get('interview_code')
+        
+        if not message or not session_id or not interview_code:
+            return jsonify({
+                'success': False,
+                'error': 'Mesaj, session_id ve interview_code gerekli'
+            }), 400
+            
+        # JSON dosyasından mülakat verilerini al
+        json_path = os.path.join('interviews', f'{interview_code}.json')
+        if not os.path.exists(json_path):
+            return jsonify({
+                'success': False,
+                'error': 'Mülakat bilgileri bulunamadı'
+            }), 404
+            
+        with open(json_path, 'r', encoding='utf-8') as f:
+            interview_data = json.load(f)
+            
+        # Konuşma geçmişini al veya oluştur
+        conversation_history = interview_data.get('conversation_history', [])
+        current_question_index = interview_data.get('current_question_index', 0)
+        
+        # Sistem promptunu hazırla
+        system_prompt = f"""Sen deneyimli ve samimi bir İK uzmanısın. Şu anda {interview_data.get('candidate_name')} ile {interview_data.get('position')} pozisyonu için mülakat yapıyorsun.
+
+        İşte sana verilen sorular:
+        {json.dumps(interview_data.get('questions', []), indent=2, ensure_ascii=False)}
+
+        Şu anki soru indeksi: {current_question_index}
+        
+        Konuşma geçmişi:
+        {json.dumps(conversation_history, indent=2, ensure_ascii=False)}
+
+        Nasıl davranmalısın:
+        1. Çok samimi ve doğal bir şekilde konuş, sanki karşında gerçekten biri varmış gibi
+        2. Her cevaptan sonra o cevapla ilgili kısa bir yorum yap. Örneğin:
+           - "Ah, bu konudaki deneyiminizi duymak güzel..."
+           - "İlginç bir yaklaşım, teşekkür ederim..."
+           - "Bu zorluklarla nasıl başa çıktığınızı anlamak önemli..."
+        3. Eğer adayın cevabını anlamazsan, nazikçe tekrar sorup açıklama iste:
+           - "Affedersiniz, tam anlayamadım. Biraz daha açıklayabilir misiniz?"
+           - "Bu konuyu biraz daha detaylandırabilir misiniz?"
+        4. Bir sonraki soruya geçerken doğal geçişler kullan:
+           - "Anlıyorum, çok teşekkürler. Şimdi başka bir konuya geçelim..."
+           - "Bu deneyimleriniz gerçekten değerli. İsterseniz şimdi..."
+           - "Güzel, bu konuyu anladım. Peki, size şunu sormak istiyorum..."
+        5. Eğer aday "merhaba" derse, sıcak bir karşılama yap:
+           - "Merhaba [isim] Bey/Hanım, bugün sizinle tanışmak çok güzel. Nasılsınız?"
+        6. Mülakat bittiğinde nazik bir kapanış yap:
+           - "Değerli vaktiniz ve paylaşımlarınız için çok teşekkür ederim. Görüşmemizi burada sonlandıralım. Size en kısa sürede dönüş yapacağız. MÜLAKAT_BİTTİ"
+
+        Önemli: Sadece verilen soruları sor ama bunu çok doğal bir sohbet havasında yap. Her cevaptan sonra mutlaka kısa bir yorum yap ve sonra diğer soruya geç."""
+            
+        # OpenAI API'ye istek gönder
+        try:
+            completion = await asyncio.get_event_loop().run_in_executor(
+                None,
+                lambda: openai_client.chat.completions.create(
+                    model="gpt-4",
+                    messages=[
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": message}
+                    ],
+                    temperature=0.7,
+                    max_tokens=150
+                )
+            )
+            
+            # Yanıtı al
+            gpt_response = completion.choices[0].message.content
+            is_interview_ended = "MÜLAKAT_BİTTİ" in gpt_response
+            
+            # Konuşma geçmişini güncelle
+            conversation_history.append({"role": "user", "content": message})
+            conversation_history.append({"role": "assistant", "content": gpt_response})
+            
+            # Soru indeksini güncelle (eğer bir soru sorulduysa)
+            if "?" in gpt_response and not is_interview_ended:
+                current_question_index += 1
+            
+            # JSON dosyasını güncelle
+            interview_data['conversation_history'] = conversation_history
+            interview_data['current_question_index'] = current_question_index
+            
+            with open(json_path, 'w', encoding='utf-8') as f:
+                json.dump(interview_data, f, ensure_ascii=False, indent=2)
+            
+            if is_interview_ended:
+                try:
+                    # Rapor oluşturma işlemini başlat
+                    await generate_interview_report(interview_code, interview_data)
+                    logger.info(f"Rapor oluşturma başarılı: {interview_code}")
+                except Exception as e:
+                    logger.error(f"Rapor oluşturma hatası: {str(e)}")
+                # MÜLAKAT_BİTTİ kelimesini çıkar
+                gpt_response = gpt_response.replace("MÜLAKAT_BİTTİ", "")
+            
+            return jsonify({
+                'success': True,
+                'text': gpt_response,
+                'interview_ended': is_interview_ended
+            })
+            
+        except Exception as e:
+            logger.error(f"OpenAI API hatası: {str(e)}")
+            return jsonify({
+                'success': False,
+                'error': f'OpenAI API hatası: {str(e)}'
+            }), 500
+            
+    except Exception as e:
+        logger.error(f"Gerçek zamanlı sohbet hatası: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+async def generate_interview_report(interview_code, interview_data):
+    try:
+        # Rapor oluşturma promptu
+        report_prompt = f"""Aşağıdaki mülakat konuşmasını analiz et ve bir değerlendirme raporu hazırla:
+
+        Pozisyon: {interview_data.get('position')}
+        Aday: {interview_data.get('candidate_name')}
+        
+        Mülakat Konuşması:
+        {json.dumps(interview_data.get('conversation_history', []), indent=2, ensure_ascii=False)}
+        
+        Lütfen aşağıdaki başlıklara göre bir rapor hazırla:
+        1. Teknik Yetkinlik
+        2. İletişim Becerileri
+        3. Problem Çözme Yaklaşımı
+        4. Güçlü Yönler
+        5. Gelişime Açık Alanlar
+        6. Genel Değerlendirme ve Öneri"""
+
+        # OpenAI API'ye istek gönder
+        completion = await asyncio.get_event_loop().run_in_executor(
+            None,
+            lambda: openai_client.chat.completions.create(
+                model="gpt-4",
+                messages=[
+                    {"role": "system", "content": "Sen bir İK uzmanısın. Mülakat değerlendirme raporu hazırlayacaksın."},
+                    {"role": "user", "content": report_prompt}
+                ],
+                temperature=0.7,
+                max_tokens=1000
+            )
+        )
+        
+        # Raporu al
+        report = completion.choices[0].message.content
+        
+        # Raporu kaydet
+        report_path = os.path.join('reports', f'{interview_code}.txt')
+        os.makedirs('reports', exist_ok=True)
+        
+        with open(report_path, 'w', encoding='utf-8') as f:
+            f.write(report)
+            
+        # Mülakat durumunu güncelle
+        interview_data['status'] = 'completed'
+        interview_data['report_path'] = report_path
+        
+        json_path = os.path.join('interviews', f'{interview_code}.json')
+        with open(json_path, 'w', encoding='utf-8') as f:
+            json.dump(interview_data, f, ensure_ascii=False, indent=2)
+            
+        logger.info(f"Mülakat raporu oluşturuldu: {report_path}")
+        
+    except Exception as e:
+        logger.error(f"Rapor oluşturma hatası: {str(e)}")
+        raise
+
+@app.route('/end_interview', methods=['POST'])
+async def end_interview():
+    try:
+        data = request.get_json()
+        interview_code = data.get('interview_code')
+        conversation_history = data.get('conversation_history', [])
+        
+        if not interview_code:
+            return jsonify({
+                'success': False,
+                'error': 'Mülakat kodu gerekli'
+            }), 400
+            
+        # Rapor oluşturma işlemini başlat
+        await generate_interview_report(interview_code, conversation_history)
+        
+        return jsonify({
+            'success': True,
+            'message': 'Mülakat sonlandırıldı ve rapor oluşturma işlemi başlatıldı'
+        })
+        
+    except Exception as e:
+        logger.error(f"Mülakat sonlandırma hatası: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+# window.onbeforeunload event'i için endpoint
+@app.route('/save_interview_state', methods=['POST'])
+async def save_interview_state():
+    """Mülakat sayfası kapatıldığında çağrılır"""
+    try:
+        data = request.get_json()
+        interview_code = data.get('interview_code')
+        
+        if not interview_code:
+            return jsonify({
+                'success': False,
+                'error': 'Mülakat kodu gerekli'
+            }), 400
+            
+        # JSON dosyasını oku
+        json_path = os.path.join('interviews', f'{interview_code}.json')
+        if not os.path.exists(json_path):
+            return jsonify({
+                'success': False,
+                'error': 'Mülakat dosyası bulunamadı'
+            }), 404
+            
+        with open(json_path, 'r', encoding='utf-8') as f:
+            interview_data = json.load(f)
+        
+        # PDF raporu oluştur
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        pdf_path = os.path.join('reports', f"mulakat_raporu_{timestamp}.pdf")
+        
+        # PDF oluşturma işlemleri
+        doc = SimpleDocTemplate(pdf_path, pagesize=A4)
+        styles = getSampleStyleSheet()
+        story = []
+        
+        # Başlık
+        title_style = ParagraphStyle(
+            'CustomTitle',
+            parent=styles['Heading1'],
+            fontSize=24,
+            spaceAfter=30
+        )
+        story.append(Paragraph("Mülakat Değerlendirme Raporu", title_style))
+        story.append(Spacer(1, 12))
+        
+        # Aday Bilgileri
+        info_style = ParagraphStyle(
+            'Info',
+            parent=styles['Normal'],
+            fontSize=12,
+            spaceAfter=6
+        )
+        story.append(Paragraph(f"Aday: {interview_data.get('candidate_name')}", info_style))
+        story.append(Paragraph(f"Pozisyon: {interview_data.get('position')}", info_style))
+        story.append(Paragraph(f"Tarih: {datetime.now().strftime('%d.%m.%Y %H:%M')}", info_style))
+        story.append(Spacer(1, 20))
+        
+        # GPT ile değerlendirme yap
+        evaluation_prompt = f"""
+        Lütfen aşağıdaki mülakat verilerini analiz ederek detaylı bir değerlendirme raporu hazırla:
+        
+        Aday: {interview_data.get('candidate_name')}
+        Pozisyon: {interview_data.get('position')}
+        
+        Mülakat Konuşması:
+        {json.dumps(interview_data.get('conversation_history', []), indent=2, ensure_ascii=False)}
+        
+        Lütfen şu başlıklara göre değerlendirme yap:
+        1. Teknik Yetkinlik (100 üzerinden puan)
+        2. İletişim Becerileri (100 üzerinden puan)
+        3. Problem Çözme Yaklaşımı (100 üzerinden puan)
+        4. Güçlü Yönler
+        5. Geliştirilmesi Gereken Alanlar
+        6. Genel Değerlendirme ve İşe Uygunluk
+        
+        Yanıtı JSON formatında ver.
+        """
+        
+        completion = await asyncio.get_event_loop().run_in_executor(
+            None,
+            lambda: openai_client.chat.completions.create(
+                model="gpt-4",
+                messages=[
+                    {"role": "system", "content": "Sen bir kıdemli İK uzmanısın."},
+                    {"role": "user", "content": evaluation_prompt}
+                ],
+                temperature=0.7,
+                max_tokens=2000
+            )
+        )
+        
+        evaluation_data = json.loads(completion.choices[0].message.content)
+        
+        # Değerlendirme Puanları
+        story.append(Paragraph("Değerlendirme Puanları", styles['Heading2']))
+        story.append(Spacer(1, 12))
+        
+        metrics_data = [
+            ["Değerlendirme Kriteri", "Puan"],
+            ["Teknik Yetkinlik", f"{evaluation_data.get('teknik_yetkinlik', 0)}/100"],
+            ["İletişim Becerileri", f"{evaluation_data.get('iletisim_becerileri', 0)}/100"],
+            ["Problem Çözme", f"{evaluation_data.get('problem_cozme', 0)}/100"]
+        ]
+        
+        t = Table(metrics_data, colWidths=[300, 100])
+        t.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, 0), 14),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+            ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+            ('TEXTCOLOR', (0, 1), (-1, -1), colors.black),
+            ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+            ('FONTSIZE', (0, 1), (-1, -1), 12),
+            ('GRID', (0, 0), (-1, -1), 1, colors.black)
+        ]))
+        story.append(t)
+        story.append(Spacer(1, 20))
+        
+        # Detaylı Değerlendirme
+        story.append(Paragraph("Detaylı Değerlendirme", styles['Heading2']))
+        story.append(Spacer(1, 12))
+        
+        story.append(Paragraph("<b>Güçlü Yönler:</b>", styles['Normal']))
+        story.append(Paragraph(evaluation_data.get('guclu_yonler', ''), styles['Normal']))
+        story.append(Spacer(1, 12))
+        
+        story.append(Paragraph("<b>Geliştirilmesi Gereken Alanlar:</b>", styles['Normal']))
+        story.append(Paragraph(evaluation_data.get('gelistirilmesi_gereken_alanlar', ''), styles['Normal']))
+        story.append(Spacer(1, 12))
+        
+        story.append(Paragraph("<b>Genel Değerlendirme:</b>", styles['Normal']))
+        story.append(Paragraph(evaluation_data.get('genel_degerlendirme', ''), styles['Normal']))
+        
+        # PDF oluştur
+        doc.build(story)
+        
+        # Webhook'a gönderilecek veriyi hazırla
+        webhook_data = {
+            "mulakat_kodu": interview_code,
+            "aday_bilgileri": {
+                "isim": interview_data.get('candidate_name'),
+                "pozisyon": interview_data.get('position'),
+                "tarih": datetime.now().isoformat()
+            },
+            "degerlendirme": evaluation_data,
+            "rapor_dosyasi": pdf_path
+        }
+        
+        # Webhook'a gönder
+        webhook_response = requests.post(
+            WEBHOOK_RAPOR_URL,
+            json=webhook_data,
+            headers={'Content-Type': 'application/json'}
+        )
+        
+        if webhook_response.status_code != 200:
+            logger.error(f"Webhook hatası: {webhook_response.status_code} - {webhook_response.text}")
+        
+        # Mülakat durumunu güncelle
+        interview_data['status'] = 'completed'
+        interview_data['report_path'] = pdf_path
+        
+        with open(json_path, 'w', encoding='utf-8') as f:
+            json.dump(interview_data, f, ensure_ascii=False, indent=2)
+        
+        return jsonify({
+            'success': True,
+            'message': 'Mülakat raporu oluşturuldu ve webhook\'a gönderildi',
+            'report_path': pdf_path
+        })
+        
+    except Exception as e:
+        logger.error(f"Rapor oluşturma hatası: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
 if __name__ == '__main__':
     try:
         print("\n=== AIVA Mülakat Sistemi Başlatılıyor ===")
@@ -1597,6 +2179,22 @@ if __name__ == '__main__':
             
             
             
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
         
     
     
@@ -1606,4 +2204,6 @@ if __name__ == '__main__':
 
 
 
+    
+    
     
