@@ -9,7 +9,6 @@ import time
 from queue import Queue
 import asyncio
 import concurrent.futures
-from google.cloud import speech, texttospeech
 import logging
 from flask import Flask, request, jsonify, render_template, redirect, send_from_directory, Response
 from flask_cors import CORS
@@ -38,7 +37,8 @@ import secrets
 import aiohttp
 import queue
 import playsound
-from gtts import gTTS
+import wave
+import tempfile
 
 # Flask ve async ayarları
 app = Flask(__name__)
@@ -54,9 +54,6 @@ load_dotenv()
 
 # OpenAI istemcisini başlat
 openai_client = OpenAI()
-
-# Doğru yol
-os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = os.path.join(os.path.dirname(__file__), 'google_credentials.json')
 
 # Gerekli dizinleri oluştur
 required_dirs = ['reports', 'temp', 'interview_questions', 'interviews']
@@ -95,23 +92,7 @@ class VoiceAssistant:
         # API ayarları
         openai_api_key = os.getenv('OPENAI_API_KEY')
         self.openai_client = OpenAI(api_key=openai_api_key)
-
-        try:
-            self.speech_client = speech.SpeechClient()
-            logger.info("Google Cloud Speech client başarıyla başlatıldı")
-        except Exception as e:
-            logger.error(f"Google Cloud Speech client başlatma hatası: {e}")
-            raise
-
-        try:
-            self.tts_client = texttospeech.TextToSpeechClient()
-            logger.info("Google Cloud Text-to-Speech client başarıyla başlatıldı")
-        except Exception as e:
-            logger.error(f"Google Cloud Text-to-Speech client başlatma hatası: {e}")
-            raise
-
-        self.eleven_api_key = os.getenv("ELEVEN_API_KEY")
-        self.voice_id = "21m00Tcm4TlvDq8ikWAM"  # Rachel sesi - değiştirilebilir
+        logger.info("OpenAI client başarıyla başlatıldı")
 
     def record_audio(self):
         """Ses kaydı yap"""
@@ -195,122 +176,87 @@ class VoiceAssistant:
         try:
             logger.debug("Ses tanıma başlıyor...")
             
-            # Ses dosyasını dönüştür
-            data, _ = sf.read(audio_file)
-            converted_file = 'temp_converted.wav'
-            sf.write(converted_file, data, 48000)  # Sample rate'i 48000 olarak ayarla
+            # WebM'den WAV'a dönüştür
+            converted_file = 'temp/temp_converted.wav'
+            ffmpeg_command = [
+                'ffmpeg', '-y',
+                '-i', audio_file,
+                '-acodec', 'pcm_s16le',
+                '-ac', '1',
+                '-ar', '48000',
+                converted_file
+            ]
             
-            with open(converted_file, 'rb') as f:
-                content = f.read()
-                
-            audio = speech.RecognitionAudio(content=content)
-            config = speech.RecognitionConfig(
-                encoding=speech.RecognitionConfig.AudioEncoding.LINEAR16,
-                sample_rate_hertz=48000,  # Sample rate'i 48000 olarak ayarla
-                language_code="tr-TR",
-                enable_automatic_punctuation=True,
-                use_enhanced=True,
-                audio_channel_count=1
-            )
-            
-            response = await asyncio.get_event_loop().run_in_executor(
-                self.executor,
-                lambda: self.speech_client.recognize(config=config, audio=audio)
-            )
-            
-            if not response.results:
-                logger.warning("Ses tanıma sonuç vermedi")
+            try:
+                subprocess.run(ffmpeg_command, check=True, capture_output=True)
+                logger.info("WebM dosyası WAV formatına dönüştürüldü")
+            except subprocess.CalledProcessError as e:
+                logger.error(f"FFmpeg dönüştürme hatası: {e.stderr.decode()}")
                 return None
-                
-            transcript = response.results[0].alternatives[0].transcript
+
+            # OpenAI Whisper API kullanarak ses tanıma
+            with open(converted_file, 'rb') as audio:
+                transcript = self.openai_client.audio.transcriptions.create(
+                    model="whisper-1",
+                    file=audio,
+                    language="tr"
+                )
+
+            # Geçici dosyaları temizle
+            for temp_file in [converted_file]:
+                if os.path.exists(temp_file):
+                    try:
+                        os.remove(temp_file)
+                        logger.info(f"Geçici dosya silindi: {temp_file}")
+                    except Exception as e:
+                        logger.warning(f"Geçici dosya silme hatası: {str(e)}")
             
-            # Geçici dosyayı temizle
-            if os.path.exists(converted_file):
-                os.remove(converted_file)
-                
-            return transcript.strip()
+            return transcript.text.strip()
             
         except Exception as e:
             logger.error(f"Ses tanıma hatası: {str(e)}")
             return None
 
     async def generate_and_play_speech(self, text):
-        """
-        Metni Eleven Labs API kullanarak sese çevirir
-        """
+        """OpenAI TTS ile metni sese çevirir ve oynatır"""
         try:
-            if not text:
-                return
+            # Tuple ise ilk elemanı al, değilse direkt metni kullan
+            if isinstance(text, tuple):
+                text = text[0]
                 
-            # GPT konuşma durumunu güncelle
-            interview_data['is_gpt_speaking'] = True
+            logger.info(f"OpenAI TTS ile ses oluşturuluyor... Metin: {text[:50]}...")
+            
+            # Temp klasörünü kontrol et
+            if not os.path.exists('temp'):
+                os.makedirs('temp')
                 
-            # Eleven Labs API endpoint
-            url = f"https://api.elevenlabs.io/v1/text-to-speech/{self.voice_id}/stream"
+            speech_file_path = "temp/temp_speech.mp3"
             
-            headers = {
-                "Accept": "audio/mpeg",
-                "Content-Type": "application/json",
-                "xi-api-key": self.eleven_api_key
-            }
+            # OpenAI TTS API çağrısı
+            response = self.openai_client.audio.speech.create(
+                model="tts-1",
+                voice="shimmer",
+                input=text
+            )
             
-            data = {
-                "text": text,
-                "model_id": "eleven_multilingual_v2",
-                "voice_settings": {
-                    "stability": 0.75,
-                    "similarity_boost": 0.75,
-                    "style": 0.5,
-                    "use_speaker_boost": True
-                }
-            }
+            # Ses dosyasını kaydet
+            response.stream_to_file(speech_file_path)
             
-            try:
-                async with aiohttp.ClientSession() as session:
-                    async with session.post(url, json=data, headers=headers) as response:
-                        if response.status == 200:
-                            # Ses akışını al
-                            audio_stream = await response.read()
-                            
-                            # Geçici ses dosyasını kaydet
-                            temp_file = "temp_speech.mp3"
-                            with open(temp_file, "wb") as f:
-                                f.write(audio_stream)
-                            
-                            # Ses dosyasını çal
-                            playsound.playsound(temp_file)
-                            
-                            # Geçici dosyayı sil
-                            if os.path.exists(temp_file):
-                                os.remove(temp_file)
-                        else:
-                            logger.error(f"Eleven Labs API Hatası: {response.status}")
-                            await self._fallback_tts(text)
-            except Exception as e:
-                logger.error(f"Eleven Labs bağlantı hatası: {str(e)}")
-                await self._fallback_tts(text)
-                        
+            # Sesi oynat
+            playsound.playsound(speech_file_path)
+            
+            # Geçici dosyayı sil
+            if os.path.exists(speech_file_path):
+                os.remove(speech_file_path)
+                logger.info("Geçici ses dosyası silindi")
+                
+            return True
+                
         except Exception as e:
-            logger.error(f"Ses üretme hatası: {str(e)}")
-            await self._fallback_tts(text)
-        finally:
-            # GPT konuşma durumunu güncelle
-            interview_data['is_gpt_speaking'] = False
-            
-    async def _fallback_tts(self, text):
-        """
-        Yedek TTS sistemi (gTTS kullanarak)
-        """
-        try:
-            logger.info("Yedek TTS sistemi kullanılıyor...")
-            tts = gTTS(text=text, lang='tr')
-            temp_file = "temp_speech.mp3"
-            tts.save(temp_file)
-            playsound.playsound(temp_file)
-            if os.path.exists(temp_file):
-                os.remove(temp_file)
-        except Exception as e:
-            logger.error(f"Yedek TTS hatası: {str(e)}")
+            logger.error(f"OpenAI TTS API hatası: {e}")
+            return False
+
+   
 
 class InterviewAssistant(VoiceAssistant):
     def __init__(self):
@@ -404,58 +350,90 @@ class InterviewAssistant(VoiceAssistant):
             })
 
     async def get_gpt_response(self, text):
-        """Mülakat bağlamında GPT yanıtını al ve bir sonraki soruyu hazırla"""
+        """Mülakat bağlamında GPT yanıtını al"""
         try:
             if not text:
                 logger.warning("Boş metin için GPT yanıtı istenemez")
-                return None
+                return None, False
 
-            # Konuşma geçmişini güncelle
+            # Konuşma geçmişini kontrol et
+            is_first_interaction = len(self.conversation_history) <= 1
+            
+            # Selamlama veya hazır olma durumunu kontrol et
+            greeting_keywords = ["merhaba", "selam", "günaydın", "iyi günler", "iyi akşamlar"]
+            ready_keywords = ["hazırım", "başlayabiliriz", "evet", "tamam"]
+            not_ready_keywords = ["hazır değilim", "bekleyin", "hayır", "durun", "anlamadım"]
+            
+            # Metni küçük harfe çevir ve kontrol et
+            text_lower = text.lower().strip()
+            
+            # Eğer ilk etkileşimse veya selamlama varsa
+            if is_first_interaction or any(keyword in text_lower for keyword in greeting_keywords):
+                greeting_response = f"Merhaba {self.candidate_name}, hoş geldiniz! Ben sizin mülakat uzmanınızım. Öncelikle kendinizi rahat hissetmenizi istiyorum, bu sadece bir sohbet. Başlamak için hazır olduğunuzda bana haber verebilirsiniz. Nasılsınız?"
+                self.conversation_history.append({"role": "user", "content": text})
+                self.conversation_history.append({"role": "assistant", "content": greeting_response})
+                return greeting_response, False
+            
+            # Hazır değilse
+            if any(keyword in text_lower for keyword in not_ready_keywords):
+                wait_response = "Anlıyorum, acele etmeyelim. Kendinizi hazır hissettiğinizde başlayabiliriz. Ben buradayım, istediğiniz zaman devam edebiliriz."
+                self.conversation_history.append({"role": "user", "content": text})
+                self.conversation_history.append({"role": "assistant", "content": wait_response})
+                return wait_response, False
+            
+            # Hazırsa ve mülakat henüz başlamamışsa
+            if self.current_question_index == 0 and any(keyword in text_lower for keyword in ready_keywords):
+                start_response = f"Harika! O zaman başlayalım. {self.candidate_name}, öncelikle bize biraz kendinizden ve kariyerinizden bahseder misiniz?"
+                self.conversation_history.append({"role": "user", "content": text})
+                self.conversation_history.append({"role": "assistant", "content": start_response})
+                self.current_question_index += 1
+                return start_response, False
+
+            # Normal mülakat akışı
             self.conversation_history.append({"role": "user", "content": text})
+            
+            # GPT'den yanıt al
+            response = await asyncio.get_event_loop().run_in_executor(
+                None,
+                lambda: openai_client.chat.completions.create(
+                    model="gpt-4",
+                    messages=[
+                        {"role": "system", "content": f"""Sen deneyimli ve empatik bir İK uzmanısın. {self.candidate_name} ile {self.position} pozisyonu için mülakat yapıyorsun.
+                        
+                        Önemli Kurallar:
+                        1. Her yanıtı dikkatle dinle ve anlamaya çalış
+                        2. Yanıtla ilgili kısa bir yorum yap
+                        3. Eğer yanıt yetersizse, nazikçe detay iste
+                        4. Yanıt anlaşılmazsa, açıklama iste
+                        5. Aday hazır olduğunda ve yanıt tamamsa, doğal bir geçişle diğer soruya geç
+                        
+                        Şu anki soru: {self.interview_questions[self.current_question_index-1] if self.current_question_index > 0 else "Henüz soru sorulmadı"}"""},
+                        *self.conversation_history[-5:],  # Son 5 mesajı kullan
+                    ],
+                    temperature=0.9,
+                    max_tokens=250
+                )
+            )
+            
+            gpt_response = response.choices[0].message.content
             
             # Cevabı değerlendir ve metrikleri güncelle
             await self._analyze_sentiment(text)
             
             # Mülakat tamamlandı mı kontrol et
             if self.current_question_index >= len(self.interview_questions):
-                # Mülakat bitti, son mesajı gönder
-                final_message = """Mülakat sona erdi. Katılımınız için teşekkür ederiz. 
-                Değerlendirme raporunuz hazırlanıyor..."""
-                
+                final_message = """Görüşmemizi burada sonlandıralım. Paylaştığınız değerli bilgiler ve ayırdığınız zaman için çok teşekkür ederim. Size en kısa sürede dönüş yapacağız. MÜLAKAT_BİTTİ"""
                 self.conversation_history.append({"role": "assistant", "content": final_message})
-                
-                # PDF raporu oluştur
-                pdf_path = self.generate_pdf_report()
-                
-                # Değerlendirme verilerini hazırla
-                evaluation_data = {
-                    "teknik_yetkinlik": self.metrics["teknik_bilgi"],
-                    "iletisim_becerileri": self.metrics["iletisim_puani"],
-                    "ozguven": self.metrics["ozguven_puani"],
-                    "genel_puan": self.metrics["genel_puan"],
-                    "guclu_yonler": [],
-                    "gelistirilmesi_gereken_yonler": [],
-                    "genel_degerlendirme": ""
-                }
-                
-                if pdf_path:
-                    # Raporu webhook'a gönder
-                    await self.send_report_webhook(pdf_path, evaluation_data)
-                    
-                return final_message, True  # True -> Mülakat bitti
+                return final_message, True
             
-            # Bir sonraki soruyu hazırla
-            next_question = self.interview_questions[self.current_question_index]
-            self.current_question_index += 1
+            # Yanıtı kaydet
+            self.conversation_history.append({"role": "assistant", "content": gpt_response})
             
-            # Soruyu kaydet ve gönder
-            self.conversation_history.append({"role": "assistant", "content": next_question})
-            
-            return next_question, False  # False -> Mülakat devam ediyor
+            return gpt_response, False
             
         except Exception as e:
             logger.error(f"GPT yanıt hatası: {str(e)}")
-            return None
+            return "Üzgünüm, bir hata oluştu. Sorunuzu tekrar edebilir misiniz?", False
 
     async def _analyze_sentiment(self, text):
         """Metni analiz et ve metrikleri güncelle"""
@@ -465,7 +443,7 @@ class InterviewAssistant(VoiceAssistant):
             Lütfen aşağıdaki cevabı analiz et ve şu metrikleri 0-100 arası puanla:
             
             Pozisyon: {self.position}
-            Soru: {self.interview_questions[self.current_question_index-1]}
+            Soru: {self.interview_questions[self.current_question_index-1] if self.current_question_index > 0 else "Giriş sorusu"}
             Cevap: "{text}"
             
             Şu formatta JSON yanıt ver:
@@ -477,7 +455,7 @@ class InterviewAssistant(VoiceAssistant):
             }}
             """
             
-            response = await openai_client.chat.completions.create(
+            response = await openai_client.chat.completions.acreate(
                 model="gpt-4",
                 messages=[
                     {"role": "system", "content": "Sen bir kıdemli yazılım mühendisi ve mülakat uzmanısın."},
@@ -787,30 +765,32 @@ def create_interview():
         try:
             # GPT ile pozisyona özel sorular oluştur
             prompt = f"""
-            {position} pozisyonu için ön görüşme soruları oluştur.
+            {position} pozisyonu için mülakat soruları oluştur.
             
             Aday Bilgileri:
             - İsim: {candidate_name}
             - Pozisyon: {position}
             
-            Lütfen aşağıdaki kriterlere göre 3-4 arası kısa ve öz soru oluştur:
-            1. Genel deneyim ve beklentiler
-            2. Pozisyona ilgi ve motivasyon
-            3. Temel teknik bilgi seviyesi
+            Önemli Kurallar:
+            1. Kesinlikle "1. soru", "2. soru" gibi numaralandırma kullanma
+            2. Her soru doğal bir sohbet akışının parçası olmalı
+            3. Sorular şu konuları kapsamalı:
+               - Genel deneyim ve motivasyon
+               - Pozisyona özel teknik bilgi
+               - Problem çözme yaklaşımı
+               - Takım çalışması ve iletişim
             
-            Önemli Notlar:
-            - Bu bir ön görüşmedir, detaylı teknik sorular sormayın
-            - Her soru kısa ve öz olmalı
-            - Adayın genel profilini anlamaya odaklanın
-            - Cevapları çok detaylı değerlendirmeyin, bir sonraki soruya geçin
+            Örnek Doğal Soru Formatı:
+            - "Bize biraz kendinizden ve kariyerinizden bahseder misiniz?"
+            - "Bu pozisyona başvurmanızın arkasındaki motivasyonunuz nedir?"
+            - "[Teknik konu] hakkındaki deneyimlerinizi paylaşır mısınız?"
             
-            Soruları liste formatında ver ve her soru Türkçe olsun.
-            """
+            Lütfen 4-5 adet doğal ve akıcı soru oluştur. Sorular Türkçe olmalı ve bir sohbet akışı içinde sorulabilecek şekilde olmalı."""
             
             response = openai_client.chat.completions.create(
                 model="gpt-4",
                 messages=[
-                    {"role": "system", "content": "Sen bir kıdemli yazılım mühendisi ve mülakat uzmanısın."},
+                    {"role": "system", "content": "Sen bir kıdemli İK uzmanısın. Doğal ve etkili mülakat soruları oluşturuyorsun."},
                     {"role": "user", "content": prompt}
                 ],
                 temperature=0.7,
@@ -828,11 +808,10 @@ def create_interview():
             logger.error(f"GPT soru oluşturma hatası: {str(e)}")
             # Hata durumunda varsayılan soruları kullan
             custom_questions = [
-                "1. Yapay zekanın temel bileşenleri hakkında bilgi verebilir misiniz?",
-                "2. Belirli bir veri setinde overfitting problemini nasıl tanımlar ve çözersiniz?",
-                "3. Günlük çalışmalarınızda hangi yapay zeka frameworklerini kullandınız?",
-                "4. Çeşitli regresyon teknikleri hakkında bilgi verebilir misiniz?",
-                "5. NLP konusunda ne gibi deneyimleriniz var?"
+                "Bize biraz kendinizden ve kariyerinizden bahseder misiniz?",
+                "Bu pozisyona başvurmanızın arkasındaki motivasyonunuz nedir?",
+                "Şimdiye kadar karşılaştığınız en zorlu teknik problemi ve nasıl çözdüğünüzü anlatır mısınız?",
+                "Takım çalışması deneyimlerinizden bahseder misiniz?"
             ]
             
         # Benzersiz kod oluştur
@@ -1042,197 +1021,108 @@ async def start_recording():
 @app.route('/process_audio', methods=['POST'])
 async def process_audio():
     try:
-        # GPT konuşuyorsa ses kaydını işleme
-        if interview_data.get('is_gpt_speaking', False):
-            return jsonify({
-                'success': False,
-                'error': 'GPT konuşurken ses kaydı alınamaz',
-                'continue_listening': True
-            })
-            
+        # Mülakat kodunu al
         interview_code = request.form.get('interview_code')
         if not interview_code:
+            logger.error("Mülakat kodu bulunamadı")
             return jsonify({
                 'success': False,
                 'error': 'Mülakat kodu gerekli'
             })
-            
+
         # Ses dosyasını al
         audio_file = request.files.get('audio')
         if not audio_file:
+            logger.error("Ses dosyası bulunamadı")
             return jsonify({
                 'success': False,
-                'error': 'Ses dosyası bulunamadı'
+                'error': 'Ses dosyası gerekli'
             })
-            
-        # JSON dosyasından mülakat verilerini al
-        json_path = os.path.join('interviews', f'{interview_code}.json')
-        if not os.path.exists(json_path):
-            return jsonify({
-                "success": False,
-                "error": "Mülakat bilgileri bulunamadı",
-                "continue_listening": True
-            }), 404
-            
-        with open(json_path, 'r', encoding='utf-8') as f:
-            interview_data = json.load(f)
 
-        # Geçici dizini kontrol et ve oluştur
-        temp_dir = os.path.join(os.getcwd(), 'temp')
-        os.makedirs(temp_dir, exist_ok=True)
-            
-        # Benzersiz dosya isimleri oluştur
-        timestamp = str(time.time()).replace('.', '_')
-        temp_webm = os.path.join(temp_dir, f'audio_{timestamp}.webm')
-        temp_wav = os.path.join(temp_dir, f'audio_{timestamp}.wav')
-        
-        temp_files = [temp_webm, temp_wav]
-        
+        # Geçici dizini kontrol et
+        if not os.path.exists('temp'):
+            os.makedirs('temp')
+
+        # Ses dosyasını kaydet
+        timestamp = int(time.time())
+        temp_path = f'temp/audio_{timestamp}_{random.randint(100000, 999999)}.webm'
+        audio_file.save(temp_path)
+        logger.info(f"WebM dosyası kaydedildi: {os.path.abspath(temp_path)}")
+
         try:
-            # WebM dosyasını kaydet
-            audio_file.save(temp_webm)
-            logger.info(f"WebM dosyası kaydedildi: {temp_webm}")
-            
-            if not os.path.exists(temp_webm):
-                raise FileNotFoundError(f"WebM dosyası oluşturulamadı: {temp_webm}")
-            
-            # FFmpeg ile WAV'a dönüştür
-            ffmpeg_command = [
-                'ffmpeg', '-y',
-                '-i', temp_webm,
-                '-acodec', 'pcm_s16le',
-                '-ac', '1',
-                '-ar', '16000',
-                temp_wav
-            ]
-            
-            # FFmpeg işlemini çalıştır
-            process = await asyncio.create_subprocess_exec(
-                *ffmpeg_command,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE
-            )
-            
-            stdout, stderr = await process.communicate()
-            
-            if process.returncode != 0:
-                raise Exception(f"FFmpeg hatası: {stderr.decode()}")
-            
-            if not os.path.exists(temp_wav):
-                raise FileNotFoundError(f"WAV dosyası oluşturulamadı: {temp_wav}")
-            
-            # Ses seviyesi kontrolü
-            data, _ = sf.read(temp_wav)
-            volume_level = float(np.max(np.abs(data))) * 100
-            
-            if volume_level < SILENCE_THRESHOLD:
+            # Ses dosyasını metne çevir
+            transcript = await current_interview.transcribe_audio(temp_path)
+            if not transcript:
+                logger.warning("Ses tanıma başarısız oldu")
                 return jsonify({
-                    "success": False,
-                    "error": "Ses seviyesi çok düşük, lütfen daha yüksek sesle konuşun",
-                    "continue_listening": True,
-                    "should_restart": True
+                    'success': False,
+                    'error': 'Ses tanınamadı'
                 })
-            
-            # Google Speech client
-            client = speech.SpeechClient()
-            
-            with open(temp_wav, 'rb') as audio_file:
-                content = audio_file.read()
-            
-            audio = speech.RecognitionAudio(content=content)
-            config = speech.RecognitionConfig(
-                encoding=speech.RecognitionConfig.AudioEncoding.LINEAR16,
-                sample_rate_hertz=16000,
-                language_code="tr-TR",
-                enable_automatic_punctuation=True,
-                use_enhanced=True,
-                audio_channel_count=1,
-                enable_separate_recognition_per_channel=False,
-                speech_contexts=[{
-                    "phrases": ["merhaba", "evet", "hayır", "tamam", "anladım"],
-                    "boost": 20.0
-                }],
-                profanity_filter=False,  # Sansürlemeyi kapat
-                enable_word_time_offsets=False  # Zaman damgalarına gerek yok
-            )
-            
-            # Ses tanıma işlemi
-            response = await asyncio.get_event_loop().run_in_executor(
-                None,
-                lambda: client.recognize(config=config, audio=audio)
-            )
-            
-            if not response.results:
-                return jsonify({
-                    "success": False,
-                    "error": "Ses tanınamadı, lütfen tekrar konuşun",
-                    "continue_listening": True,
-                    "should_restart": True
-                })
-            
-            transcript = response.results[0].alternatives[0].transcript
-            confidence = response.results[0].alternatives[0].confidence
 
-            # Realtime chat endpoint'ine yönlendir
-            async with aiohttp.ClientSession() as session:
-                async with session.post(
-                    f"{request.host_url}realtime_chat",
-                    json={
-                        "message": transcript,
-                        "session_id": "audio_session",
-                        "interview_code": interview_code
-                    }
-                ) as chat_response:
-                    chat_data = await chat_response.json()
-                    
-                    if not chat_data.get('success'):
-                        return jsonify({
-                            "success": False,
-                            "error": chat_data.get('error', 'GPT yanıt hatası'),
-                            "continue_listening": True
-                        }), 500
-                    
-                    return jsonify({
-                        "success": True,
-                        "transcript": transcript,
-                        "response": chat_data.get("text", ""),
-                        "confidence": confidence,
-                        "interview_ended": chat_data.get("interview_ended", False)
-                    })
-            
-        except FileNotFoundError as e:
-            logger.error(f"Dosya bulunamadı hatası: {str(e)}")
-            return jsonify({
-                "success": False,
-                "error": f"Dosya bulunamadı: {str(e)}",
-                "continue_listening": True
-            }), 500
-            
+            logger.info(f"Tanınan metin: {transcript}")
+
+            # GPT yanıtını al
+            gpt_response, is_interview_ended = await current_interview.get_gpt_response(transcript)
+            if not gpt_response:
+                logger.warning("GPT yanıtı alınamadı")
+                return jsonify({
+                    'success': False,
+                    'error': 'GPT yanıtı alınamadı'
+                })
+
+            logger.info(f"GPT yanıtı: {gpt_response}")
+
+            # Yanıtı hemen gönder
+            response_data = {
+                'success': True,
+                'transcript': transcript,
+                'response': gpt_response,
+                'interview_ended': is_interview_ended
+            }
+
+            # Ses dosyasını arka planda oluştur ve çal
+            async def generate_and_play_speech():
+                try:
+                    speech_file_path = "temp/temp_speech.mp3"
+                    tts_response = openai_client.audio.speech.create(
+                        model="tts-1",
+                        voice="shimmer",
+                        input=gpt_response
+                    )
+                    tts_response.stream_to_file(speech_file_path)
+                    playsound.playsound(speech_file_path)
+                    if os.path.exists(speech_file_path):
+                        os.remove(speech_file_path)
+                except Exception as e:
+                    logger.error(f"Ses oluşturma/çalma hatası: {str(e)}")
+
+            # Ses oluşturma ve çalma işlemini arka planda başlat
+            asyncio.create_task(generate_and_play_speech())
+
+            return jsonify(response_data)
+
         except Exception as e:
             logger.error(f"Ses işleme hatası: {str(e)}")
             return jsonify({
-                "success": False,
-                "error": str(e),
-                "continue_listening": True
-            }), 500
-            
+                'success': False,
+                'error': 'Ses işlenemedi'
+            })
+
+        finally:
+            # Geçici dosyayı temizle
+            if os.path.exists(temp_path):
+                try:
+                    os.remove(temp_path)
+                    logger.info("Geçici ses dosyası silindi")
+                except Exception as e:
+                    logger.warning(f"Geçici dosya silme hatası: {str(e)}")
+
     except Exception as e:
         logger.error(f"Genel hata: {str(e)}")
         return jsonify({
-            "success": False,
-            "error": str(e),
-            "continue_listening": True
-        }), 500
-        
-    finally:
-        # Geçici dosyaları temizle
-        for file_path in temp_files:
-            try:
-                if os.path.exists(file_path):
-                    os.remove(file_path)
-                    logger.debug(f"Geçici dosya silindi: {file_path}")
-            except Exception as e:
-                logger.error(f"Dosya silme hatası ({file_path}): {str(e)}")
+            'success': False,
+            'error': str(e)
+        })
 
 @app.route('/generate_report', methods=['POST'])
 async def generate_report():
@@ -1796,9 +1686,9 @@ async def realtime_chat():
         current_question_index = interview_data.get('current_question_index', 0)
         
         # Sistem promptunu hazırla
-        system_prompt = f"""Sen deneyimli ve samimi bir İK uzmanısın. Şu anda {interview_data.get('candidate_name')} ile {interview_data.get('position')} pozisyonu için mülakat yapıyorsun.
+        system_prompt = f"""Sen deneyimli ve empatik bir İK uzmanısın. Şu anda {interview_data.get('candidate_name')} ile {interview_data.get('position')} pozisyonu için mülakat yapıyorsun.
 
-        İşte sana verilen sorular:
+        Mülakat soruları:
         {json.dumps(interview_data.get('questions', []), indent=2, ensure_ascii=False)}
 
         Şu anki soru indeksi: {current_question_index}
@@ -1806,26 +1696,42 @@ async def realtime_chat():
         Konuşma geçmişi:
         {json.dumps(conversation_history, indent=2, ensure_ascii=False)}
 
-        Nasıl davranmalısın:
-        1. Çok samimi ve doğal bir şekilde konuş, sanki karşında gerçekten biri varmış gibi
-        2. Her cevaptan sonra o cevapla ilgili kısa bir yorum yap. Örneğin:
-           - "Ah, bu konudaki deneyiminizi duymak güzel..."
-           - "İlginç bir yaklaşım, teşekkür ederim..."
-           - "Bu zorluklarla nasıl başa çıktığınızı anlamak önemli..."
-        3. Eğer adayın cevabını anlamazsan, nazikçe tekrar sorup açıklama iste:
-           - "Affedersiniz, tam anlayamadım. Biraz daha açıklayabilir misiniz?"
-           - "Bu konuyu biraz daha detaylandırabilir misiniz?"
-        4. Bir sonraki soruya geçerken doğal geçişler kullan:
-           - "Anlıyorum, çok teşekkürler. Şimdi başka bir konuya geçelim..."
-           - "Bu deneyimleriniz gerçekten değerli. İsterseniz şimdi..."
-           - "Güzel, bu konuyu anladım. Peki, size şunu sormak istiyorum..."
-        5. Eğer aday "merhaba" derse, sıcak bir karşılama yap:
-           - "Merhaba [isim] Bey/Hanım, bugün sizinle tanışmak çok güzel. Nasılsınız?"
-        6. Mülakat bittiğinde nazik bir kapanış yap:
-           - "Değerli vaktiniz ve paylaşımlarınız için çok teşekkür ederim. Görüşmemizi burada sonlandıralım. Size en kısa sürede dönüş yapacağız. MÜLAKAT_BİTTİ"
+        Önemli Kurallar:
+        1. Adayın hazır olma durumunu mutlaka kontrol et:
+           - "Hazır değilim" veya benzeri bir yanıt gelirse:
+             * "Anlıyorum, acele etmeyelim. Hazır olduğunuzda başlayalım. Kendinizi rahat hissettiğinizde bana haber verebilirsiniz."
+             * "Biraz daha zaman ister misiniz? Ben buradayım, hazır olduğunuzda başlayabiliriz."
+           - Aday hazır olduğunu belirtene kadar bir sonraki soruya geçme
+        
+        2. Soru tekrarı isteklerini dikkatle dinle:
+           - "Anlamadım", "Tekrar eder misiniz" gibi ifadelerde:
+             * "Tabii ki, soruyu farklı bir şekilde açıklayayım..."
+             * "Elbette, şöyle sorayım..."
+           - Soruyu farklı kelimelerle, daha açıklayıcı bir şekilde tekrar et
+           - Aday anlayana kadar bir sonraki soruya geçme
+        
+        3. Her yanıttan sonra:
+           - Adayın cevabını anladığını göster
+           - Kısa ve samimi bir yorum yap
+           - Eğer cevap yetersizse, nazikçe detay iste
+           - Aday hazırsa ve cevap tamamsa, bir sonraki konuya doğal bir geçiş yap
+        
+        4. Doğal konuşma örnekleri:
+           - "Bu konudaki deneyimlerinizi dinlemek çok değerli. Peki, [sonraki konu] hakkında ne düşünüyorsunuz?"
+           - "Anlıyorum, yaklaşımınız ilginç. İsterseniz şimdi biraz da [yeni konu] hakkında konuşalım..."
+           - "Bu tecrübeleriniz etkileyici. Başka bir konuya geçmeden önce eklemek istediğiniz bir şey var mı?"
+        
+        5. Eğer aday gergin veya stresli görünüyorsa:
+           - "Kendinizi rahat hissetmeniz çok önemli. Acele etmeyelim..."
+           - "Bu sadece bir sohbet, kendinizi baskı altında hissetmeyin..."
+           - "İsterseniz biraz ara verebiliriz..."
+        
+        6. Mülakat bitişi:
+           - Tüm sorular tamamlandığında nazik bir kapanış yap
+           - "Paylaştığınız değerli bilgiler için teşekkür ederim. Görüşmemizi burada sonlandıralım. Size en kısa sürede dönüş yapacağız. MÜLAKAT_BİTTİ"
+        
+        En önemli nokta: Bu bir robot-insan konuşması değil, iki insan arasında geçen doğal bir sohbet olmalı. Adayın her tepkisine ve ihtiyacına uygun şekilde yanıt ver. Acele etme, adayın rahat hissetmesini sağla."""
 
-        Önemli: Sadece verilen soruları sor ama bunu çok doğal bir sohbet havasında yap. Her cevaptan sonra mutlaka kısa bir yorum yap ve sonra diğer soruya geç."""
-            
         # OpenAI API'ye istek gönder
         try:
             completion = await asyncio.get_event_loop().run_in_executor(
@@ -1834,10 +1740,11 @@ async def realtime_chat():
                     model="gpt-4",
                     messages=[
                         {"role": "system", "content": system_prompt},
+                        *conversation_history[-5:],  # Son 5 mesajı kullan
                         {"role": "user", "content": message}
                     ],
-                    temperature=0.7,
-                    max_tokens=150
+                    temperature=0.9,
+                    max_tokens=250
                 )
             )
             
@@ -2172,38 +2079,3 @@ if __name__ == '__main__':
         if 'observer' in locals() and observer:
             observer.stop()
             observer.join()
-            
-            
-            
-            
-            
-            
-            
-            
-            
-            
-            
-            
-            
-            
-            
-            
-            
-            
-            
-            
-            
-            
-            
-        
-    
-    
-        
-        
-            
-
-
-
-    
-    
-    

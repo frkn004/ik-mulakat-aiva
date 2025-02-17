@@ -71,19 +71,7 @@
             z-index: 10;
             overflow: hidden;
             transform-origin: center center;
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-        }
-
-        .aiva-avatar:hover {
-            transform: translate(-50%, -50%);
-        }
-
-        .aiva-avatar.speaking {
-            animation: gentle-pulse 1s ease-in-out infinite;
-        }
-
-        .aiva-avatar.listening {
-            animation: gentle-shrink 1s ease-in-out infinite;
+            transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
         .aiva-avatar i {
@@ -91,7 +79,73 @@
             color: white;
             text-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
             z-index: 2;
-            transition: transform 0.3s ease;
+            transition: all 0.5s ease;
+        }
+
+        /* Robot Animasyonları */
+        .aiva-avatar.speaking {
+            animation: robot-speak 2s infinite;
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            box-shadow: 0 20px 40px rgba(16, 185, 129, 0.4);
+        }
+
+        .aiva-avatar.speaking i {
+            animation: robot-icon-speak 1s infinite;
+        }
+
+        .aiva-avatar.listening {
+            animation: robot-listen 3s infinite;
+            background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+            box-shadow: 0 20px 40px rgba(239, 68, 68, 0.4);
+        }
+
+        .aiva-avatar.listening i {
+            animation: robot-icon-listen 1.5s infinite;
+        }
+
+        .aiva-avatar.idle {
+            animation: robot-idle 4s infinite;
+        }
+
+        .aiva-avatar.idle i {
+            animation: robot-icon-idle 2s infinite;
+        }
+
+        @keyframes robot-speak {
+            0% { transform: translate(-50%, -50%) scale(1); }
+            50% { transform: translate(-50%, -50%) scale(1.05); }
+            100% { transform: translate(-50%, -50%) scale(1); }
+        }
+
+        @keyframes robot-icon-speak {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.1); color: #ffffff; }
+            100% { transform: scale(1); }
+        }
+
+        @keyframes robot-listen {
+            0% { transform: translate(-50%, -50%) scale(1); }
+            50% { transform: translate(-50%, -50%) scale(0.95); }
+            100% { transform: translate(-50%, -50%) scale(1); }
+        }
+
+        @keyframes robot-icon-listen {
+            0% { transform: scale(1) rotate(0deg); }
+            50% { transform: scale(1.1) rotate(5deg); }
+            100% { transform: scale(1) rotate(0deg); }
+        }
+
+        @keyframes robot-idle {
+            0% { transform: translate(-50%, -50%); }
+            25% { transform: translate(-50%, -52%); }
+            75% { transform: translate(-50%, -48%); }
+            100% { transform: translate(-50%, -50%); }
+        }
+
+        @keyframes robot-icon-idle {
+            0% { transform: translateY(0); }
+            50% { transform: translateY(-5px); }
+            100% { transform: translateY(0); }
         }
 
         /* Modal Styles */
@@ -112,16 +166,19 @@
             background: white;
             padding: 2rem;
             border-radius: 1rem;
-            max-width: 600px;
+            max-width: 800px;
             width: 90%;
+            max-height: 90vh;
+            overflow-y: auto;
             position: relative;
         }
 
         .modal-header {
             font-size: 1.5rem;
             font-weight: bold;
-            margin-bottom: 1rem;
+            margin-bottom: 1.5rem;
             color: #f59e0b;
+            text-align: center;
         }
 
         .modal-body {
@@ -129,20 +186,23 @@
         }
 
         .modal-footer {
-            text-align: right;
+            text-align: center;
+            margin-top: 2rem;
         }
 
         .modal-button {
-            background: #f59e0b;
+            background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
             color: white;
-            padding: 0.5rem 1rem;
+            padding: 0.75rem 2rem;
             border-radius: 0.5rem;
+            font-weight: 500;
             cursor: pointer;
-            transition: background 0.3s ease;
+            transition: all 0.3s ease;
         }
 
         .modal-button:hover {
-            background: #d97706;
+            background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+            transform: translateY(-2px);
         }
 
         .chat-messages {
@@ -155,183 +215,128 @@
 
         .chat-bubble {
             position: fixed;
-            max-width: 300px;
+            max-width: 400px;
             padding: 1.5rem;
             border-radius: 20px;
             background: white;
-            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
             pointer-events: auto;
             opacity: 0;
-            transform: scale(0.8);
-            transition: all 0.5s ease-out;
+            transform: scale(0.8) translateY(20px);
+            transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
         }
 
         .chat-bubble.active {
             opacity: 1;
-            transform: scale(1);
+            transform: scale(1) translateY(0);
         }
 
         .chat-bubble.fade-out {
             opacity: 0;
-            transform: scale(0.8);
-            transition: all 0.3s ease-in;
+            transform: scale(0.9) translateY(-20px);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
         .assistant-bubble {
-            left: 75%;  /* Sağa kaydır */
-            top: 30%;   /* Yukarı kaydır */
+            left: 60%;
+            top: 30%;
             background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
-            border: 1px solid rgba(251, 191, 36, 0.2);
+            border: 1px solid rgba(16, 185, 129, 0.2);
         }
 
         .user-bubble {
-            right: 75%;  /* Sola kaydır */
-            top: 60%;    /* Aşağı kaydır */
-            background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
+            right: 60%;
+            top: 60%;
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
             color: white;
         }
 
-        @keyframes bubbleFloat {
-            from {
-                opacity: 0;
-                transform: scale(0.8) translateY(20px);
-            }
-            to {
-                opacity: 1;
-                transform: scale(1) translateY(0);
-            }
+        .message-content {
+            display: flex;
+            align-items: flex-start;
+            gap: 0.75rem;
         }
 
-        .assistant-bubble::before {
-            content: '';
-            position: absolute;
-            bottom: -0.5rem;
-            left: 1rem;
-            background: white;
-            border-right: 1px solid #e5e7eb;
-            border-bottom: 1px solid #e5e7eb;
-            clip-path: polygon(0 0, 0 100%, 100% 0);
-            width: 1rem;
-            height: 1rem;
-        }
-
-        .user-bubble::before {
-            content: '';
-            position: absolute;
-            bottom: -0.5rem;
-            right: 1rem;
-            background: #4f46e5;
-            clip-path: polygon(0 0, 100% 100%, 100% 0);
-            width: 1rem;
-            height: 1rem;
-        }
-
-        @keyframes gentle-pulse {
-            0% { transform: translate(-50%, -50%) scale(1); }
-            50% { transform: translate(-50%, -50%) scale(1.02); }
-            100% { transform: translate(-50%, -50%) scale(1); }
-        }
-
-        @keyframes gentle-shrink {
-            0% { transform: translate(-50%, -50%) scale(1); }
-            50% { transform: translate(-50%, -50%) scale(0.98); }
-            100% { transform: translate(-50%, -50%) scale(1); }
-        }
-
-        .avatar-effect {
-            position: absolute;
-            width: 100%;
-            height: 100%;
+        .message-icon {
+            flex-shrink: 0;
+            width: 2rem;
+            height: 2rem;
             border-radius: 50%;
-            background: radial-gradient(circle at center, rgba(255,255,255,0.2) 0%, transparent 70%);
-            animation: rotate 8s linear infinite;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(255, 255, 255, 0.1);
         }
 
-        .avatar-effect::before {
-            content: '';
-            position: absolute;
-            width: 150%;
-            height: 150%;
-            top: -25%;
-            left: -25%;
-            background: linear-gradient(45deg, transparent 45%, rgba(255,255,255,0.15) 50%, transparent 55%);
-            animation: wave 3s ease-in-out infinite;
+        .assistant-bubble .message-icon {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            color: white;
         }
 
-        .avatar-effect.speaking {
-            animation: rotate-fast 4s linear infinite;
+        .user-bubble .message-icon {
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
         }
 
-        .avatar-effect.listening {
-            animation: rotate-slow 12s linear infinite;
-        }
-
-        @keyframes rotate {
-            from { transform: rotate(0deg); }
-            to { transform: rotate(360deg); }
-        }
-
-        @keyframes rotate-fast {
-            from { transform: rotate(0deg); }
-            to { transform: rotate(360deg); }
-        }
-
-        @keyframes rotate-slow {
-            from { transform: rotate(360deg); }
-            to { transform: rotate(0deg); }
-        }
-
-        @keyframes wave {
-            0% { transform: translateX(-30%) rotate(0deg); }
-            50% { transform: translateX(0%) rotate(180deg); }
-            100% { transform: translateX(-30%) rotate(360deg); }
+        .message-text {
+            flex-grow: 1;
+            font-size: 1rem;
+            line-height: 1.5;
         }
 
         .status-indicator {
             position: fixed;
-            bottom: 80px; /* Mod butonunun üstünde */
-            left: 20px; /* Mod butonu ile aynı hizada */
+            bottom: 80px;
+            left: 20px;
             background: white;
-            padding: 0.8rem 1.5rem;
+            padding: 1rem 1.5rem;
             border-radius: 1rem;
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
             display: flex;
             align-items: center;
-            gap: 0.5rem;
-            font-size: 1rem;
+            gap: 1rem;
+            font-size: 1.1rem;
             font-weight: 500;
             color: #4f46e5;
             transition: all 0.3s ease;
             white-space: nowrap;
             z-index: 11;
+            min-width: 250px;
+        }
+
+        .status-indicator i {
+            font-size: 1.4rem;
         }
 
         .status-indicator.speaking {
-            background: #10b981;
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
             color: white;
+            animation: status-pulse 2s infinite;
         }
 
         .status-indicator.listening {
-            background: #ef4444;
+            background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
             color: white;
+            animation: status-pulse 1s infinite;
+        }
+
+        .status-indicator.processing {
+            background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
+            color: white;
+            animation: status-pulse 0.5s infinite;
         }
 
         .status-indicator.idle {
-            background: #6b7280;
+            background: linear-gradient(135deg, #6b7280 0%, #4b5563 100%);
             color: white;
         }
 
-        .status-dot {
-            width: 8px;
-            height: 8px;
-            border-radius: 50%;
-            background: #6b7280;
-            transition: background-color 0.3s ease;
-        }
-
-        .status-dot.listening {
-            background: #ef4444;
-            animation: blink 1s infinite;
+        @keyframes status-pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.02); }
+            100% { transform: scale(1); }
         }
 
         .auto-mode .status-indicator {
@@ -394,7 +399,7 @@
             opacity: 0.7;
         }
 
-        /* Mod butonunu ekle */
+        /* Mod butonları için stiller */
         .mode-button {
             position: fixed;
             bottom: 20px;
@@ -416,12 +421,47 @@
 
         .mode-button:hover {
             background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
-            transform: translateX(5px); /* Sağa doğru hareket */
+            transform: translateY(-2px);
             box-shadow: 0 12px 20px rgba(251, 191, 36, 0.4);
         }
 
         .mode-button i {
             font-size: 1.2rem;
+        }
+
+        #manualModeButton {
+            left: 20px;
+            bottom: 80px;
+        }
+
+        #autoModeButton {
+            left: 20px;
+            bottom: 20px;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        /* Başlangıç butonu için özel stil */
+        #modeButton {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            box-shadow: 0 8px 16px rgba(16, 185, 129, 0.3);
+        }
+
+        #modeButton:hover {
+            background: linear-gradient(135deg, #059669 0%, #047857 100%);
+            box-shadow: 0 12px 20px rgba(16, 185, 129, 0.4);
+        }
+
+        #modeButton.interview-started {
+            background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
+            box-shadow: 0 8px 16px rgba(251, 191, 36, 0.3);
+        }
+
+        #modeButton.interview-started:hover {
+            background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+            box-shadow: 0 12px 20px rgba(251, 191, 36, 0.4);
         }
 
         /* Baloncuklar için farklı pozisyonlar */
@@ -455,6 +495,64 @@
             right: 10%; 
             transform: translateX(50%) rotate(3deg);
         }
+
+        .processing-steps {
+            position: fixed;
+            top: 50%;
+            left: 20px;
+            transform: translateY(-50%);
+            background: rgba(255, 255, 255, 0.95);
+            padding: 1rem;
+            border-radius: 0.8rem;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+            z-index: 1000;
+            display: none;
+            text-align: left;
+            min-width: 250px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(0, 0, 0, 0.1);
+        }
+
+        .processing-step {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin: 0.3rem 0;
+            padding: 0.4rem 0.6rem;
+            border-radius: 0.5rem;
+            transition: all 0.3s ease;
+            opacity: 0.5;
+            font-size: 0.9rem;
+        }
+
+        .processing-step.active {
+            opacity: 1;
+            background: rgba(79, 70, 229, 0.1);
+        }
+
+        .processing-step.completed {
+            opacity: 1;
+            color: #059669;
+            font-size: 0.85rem;
+        }
+
+        .processing-step i {
+            width: 20px;
+            height: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.9rem;
+        }
+
+        .step-spinner {
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
     </style>
 </head>
 <body>
@@ -468,30 +566,46 @@
                 Mülakat Bilgilendirmesi
             </div>
             <div class="modal-body">
-                <p class="mb-3">🎯 <strong>Mülakat Başlatma:</strong> Robot simgesine tıklayarak mülakatı başlatabilirsiniz.</p>
-                
-                <p class="mb-3">🎤 <strong>Manuel Mod:</strong>
-                    <ul class="list-disc ml-6">
-                        <li>Space tuşuna basılı tutarak konuşun</li>
-                        <li>Tuşu bıraktığınızda kayıt otomatik durur</li>
-                    </ul>
-                </p>
-                
-                <p class="mb-3">🔄 <strong>Otomatik Mod:</strong>
-                    <ul class="list-disc ml-6">
-                        <li>Robot simgesine ikinci kez tıklayarak otomatik moda geçebilirsiniz</li>
-                        <li>Ses seviyeniz algılandığında kayıt otomatik başlar ve durur</li>
-                    </ul>
-                </p>
-                
-                <p class="mb-3">⚠️ <strong>Önemli Notlar:</strong>
-                    <ul class="list-disc ml-6">
-                        <li>GPT'nin konuşması bitene kadar bekleyin</li>
-                        <li>"Otomatik dinleme aktif" yazısını görmeden konuşmaya başlamayın</li>
-                        <li>Net ve yavaş konuşun</li>
-                        <li>Cevaplarınızı çok geciktirmeyin, uzun sessizliklerde sistem bir sonraki soruya geçebilir</li>
-                    </ul>
-                </p>
+                <div class="space-y-4">
+                    <div class="bg-yellow-50 p-4 rounded-lg border border-yellow-200">
+                        <p class="text-yellow-800 font-semibold mb-2">⚠️ Önemli Not:</p>
+                        <p class="text-yellow-700">Bu uygulama en iyi Google Chrome tarayıcısında çalışmaktadır. Lütfen Chrome kullanınız.</p>
+                    </div>
+
+                    <div class="bg-blue-50 p-4 rounded-lg border border-blue-200">
+                        <p class="text-blue-800 font-semibold mb-2">🎯 Mülakat Modları:</p>
+                        <div class="space-y-2">
+                            <p class="flex items-center text-blue-700">
+                                <i class="fas fa-microphone mr-2"></i>
+                                <strong>Otomatik Mod:</strong> Sesiniz algılandığında otomatik kayıt başlar ve durur
+                            </p>
+                            <p class="flex items-center text-blue-700">
+                                <i class="fas fa-hand mr-2"></i>
+                                <strong>Manuel Mod:</strong> Space tuşuna basılı tutarak konuşabilirsiniz
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="bg-green-50 p-4 rounded-lg border border-green-200">
+                        <p class="text-green-800 font-semibold mb-2">✅ Başlarken:</p>
+                        <ul class="list-disc ml-6 space-y-2 text-green-700">
+                            <li>"Mülakata Başla" butonuna tıklayın</li>
+                            <li>Mod seçimi için butona tekrar tıklayabilirsiniz</li>
+                            <li>GPT'nin konuşması bitene kadar bekleyin</li>
+                            <li>Net ve anlaşılır konuşun</li>
+                            <li>Cevaplarınızı çok geciktirmeyin</li>
+                        </ul>
+                    </div>
+
+                    <div class="bg-red-50 p-4 rounded-lg border border-red-200">
+                        <p class="text-red-800 font-semibold mb-2">❌ Dikkat Edilmesi Gerekenler:</p>
+                        <ul class="list-disc ml-6 space-y-2 text-red-700">
+                            <li>Mikrofon izni vermeyi unutmayın</li>
+                            <li>Gürültülü ortamlardan kaçının</li>
+                            <li>Sistem sizi anlamadığında tekrar deneyin</li>
+                        </ul>
+                    </div>
+                </div>
             </div>
             <div class="modal-footer">
                 <button class="modal-button" onclick="closeModal()">Anladım, Başla</button>
@@ -499,7 +613,7 @@
         </div>
     </div>
 
-        <!-- Header -->
+    <!-- Header -->
     <div class="header">
         <div class="max-w-7xl mx-auto px-4">
             <div class="flex justify-between items-center">
@@ -512,8 +626,8 @@
                     <p class="text-xs text-gray-500">{{ interview.created_at }}</p>
                 </div>
             </div>
-                </div>
-            </div>
+        </div>
+    </div>
 
     <div class="chat-container">
         <!-- AIVA Avatar -->
@@ -534,6 +648,16 @@
 
     <!-- Mod Butonu -->
     <button class="mode-button" id="modeButton">
+        <i class="fas fa-play"></i>
+        <span>Mülakata Başla</span>
+    </button>
+
+    <button class="mode-button hidden" id="manualModeButton">
+        <i class="fas fa-hand"></i>
+        <span>Manuel Mod</span>
+    </button>
+
+    <button class="mode-button hidden" id="autoModeButton">
         <i class="fas fa-microphone"></i>
         <span>Otomatik Mod</span>
     </button>
@@ -618,6 +742,9 @@
 
         // Sayfa yüklendiğinde
         document.addEventListener('DOMContentLoaded', async () => {
+            // Modal'ı göster
+            showModal();
+
             // Realtime oturumu başlat
             const initialized = await initializeRealtimeSession();
             if (!initialized) {
@@ -630,19 +757,52 @@
             // Diğer başlangıç ayarları...
             updateAvatarState('idle');
             
-            // Mod butonu için event listener
+            // Mülakata Başla/Mod butonu için event listener
             document.getElementById('modeButton').addEventListener('click', () => {
                 if (!interviewEnded) {
-                    isAutoMode = !isAutoMode;
-                    const modeButton = document.getElementById('modeButton');
-                    if (isAutoMode) {
+                    if (document.getElementById('modeButton').classList.contains('interview-started')) {
+                        // Mod değiştirme
+                        isAutoMode = !isAutoMode;
+                        const modeButton = document.getElementById('modeButton');
+                        if (isAutoMode) {
+                            startVoiceDetection();
+                            updateAvatarState('listening');
+                            modeButton.innerHTML = '<i class="fas fa-microphone"></i> <span>Otomatik Mod</span>';
+                            updateStatus('Otomatik mod aktif', 'auto');
+                        } else {
+                            updateAvatarState('idle');
+                            modeButton.innerHTML = '<i class="fas fa-hand"></i> <span>Manuel Mod</span>';
+                            updateStatus('Manuel mod aktif', 'manual');
+                        }
+                    } else {
+                        // Mülakatı başlat
+                        const modeButton = document.getElementById('modeButton');
+                        modeButton.classList.add('interview-started');
+                        modeButton.innerHTML = '<i class="fas fa-microphone"></i> <span>Otomatik Mod</span>';
+                        isAutoMode = true;
                         startVoiceDetection();
                         updateAvatarState('listening');
-                        modeButton.innerHTML = '<i class="fas fa-microphone"></i> <span>Otomatik Mod</span>';
-                    } else {
-                        updateAvatarState('idle');
-                        modeButton.innerHTML = '<i class="fas fa-hand"></i> <span>Manuel Mod</span>';
+                        updateStatus('Otomatik mod aktif', 'auto');
                     }
+                }
+            });
+
+            // Manuel Mod butonu için event listener
+            document.getElementById('manualModeButton').addEventListener('click', () => {
+                if (!interviewEnded) {
+                    isAutoMode = false;
+                    updateAvatarState('idle');
+                    updateStatus('Manuel mod aktif', 'manual');
+                }
+            });
+
+            // Otomatik Mod butonu için event listener
+            document.getElementById('autoModeButton').addEventListener('click', () => {
+                if (!interviewEnded) {
+                    isAutoMode = true;
+                    startVoiceDetection();
+                    updateAvatarState('listening');
+                    updateStatus('Otomatik mod aktif', 'auto');
                 }
             });
 
@@ -671,10 +831,19 @@
         // Ses kaydını işleme fonksiyonunu güncelle
         async function processAudio(audioBlob) {
             try {
-                updateAvatarState('idle');
+                // Önceki kullanıcı mesajını temizle
+                const existingUserMessages = document.querySelectorAll('.chat-bubble.user-bubble');
+                existingUserMessages.forEach(msg => {
+                    msg.classList.add('fade-out');
+                    setTimeout(() => msg.remove(), 300);
+                });
+
+                updateStatus('Ses işleniyor...', 'processing');
+                updateAvatarState('processing');
                 await sendAudioToRealtime(audioBlob);
             } catch (error) {
                 console.error('Ses işleme hatası:', error);
+                updateStatus('Bir hata oluştu', 'error');
                 updateAvatarState('idle');
             }
         }
@@ -948,23 +1117,32 @@
         }
 
         async function speakResponse(text) {
+            if (isSpeaking || isGPTSpeaking) {
+                console.log('Zaten konuşma devam ediyor');
+                return;
+            }
+
             return new Promise((resolve) => {
-                // Önceki konuşmaları temizle
                 window.speechSynthesis.cancel();
-                
-                // Ses sistemini durdur
-                stopAudioSystem();
                 
                 const utterance = new SpeechSynthesisUtterance(text);
                 utterance.lang = 'tr-TR';
                 utterance.rate = 1.0;
                 utterance.pitch = 1.0;
+                utterance.volume = 1.0;
+                
+                let voices = speechSynthesis.getVoices();
+                let turkishVoice = voices.find(voice => voice.lang === 'tr-TR');
+                if (turkishVoice) {
+                    utterance.voice = turkishVoice;
+                }
                 
                 utterance.onstart = () => {
                     console.log('GPT konuşmaya başladı');
                     isSpeaking = true;
                     isGPTSpeaking = true;
-                    updateStatus('GPT konuşuyor...', 'speaking');
+                    updateStatus('GPT yanıt veriyor...', 'speaking');
+                    updateAvatarState('speaking');
                 };
                 
                 utterance.onend = async () => {
@@ -972,16 +1150,15 @@
                     isSpeaking = false;
                     isGPTSpeaking = false;
                     
-                    // GPT konuşması bittikten sonra ses sistemini yeniden başlat
-                    setTimeout(async () => {
-                        if (!interviewEnded) {
-                            await initAudio();
-                            if (isAutoMode) {
-                                startVoiceDetection();
-                                updateStatus('Otomatik dinleme aktif', 'auto');
-                            }
-                        }
-                    }, 2000); // 2 saniye bekle
+                    if (isAutoMode) {
+                        updateStatus('Sesinizi bekliyorum...', 'auto');
+                        updateAvatarState('listening');
+                        await initAudio();
+                        startVoiceDetection();
+                    } else {
+                        updateStatus('Space tuşuna basılı tutarak konuşun', 'manual');
+                        updateAvatarState('idle');
+                    }
                     
                     resolve();
                 };
@@ -990,21 +1167,16 @@
                     console.error('Konuşma hatası:', event.error);
                     isSpeaking = false;
                     isGPTSpeaking = false;
-                    
-                    setTimeout(async () => {
-                        if (!interviewEnded) {
-                            await initAudio();
-                            if (isAutoMode) {
-                                startVoiceDetection();
-                                updateStatus('Otomatik dinleme aktif', 'auto');
-                            }
-                        }
-                    }, 2000);
-                    
+                    updateStatus('Konuşma hatası oluştu', 'error');
+                    updateAvatarState('idle');
                     resolve();
                 };
-                
-                window.speechSynthesis.speak(utterance);
+
+                if (!isSpeaking && !isGPTSpeaking) {
+                    window.speechSynthesis.speak(utterance);
+                } else {
+                    resolve();
+                }
             });
         }
 
@@ -1046,15 +1218,15 @@
                     return;
                 }
 
+                // İşlem aşamalarını göster
+                showProcessingSteps();
+                updateProcessingStep('transcribe', 'active');
+
                 const formData = new FormData();
                 formData.append('audio', audioBlob, 'audio.webm');
                 formData.append('interview_code', interviewCode);
 
                 console.log('Ses kaydı gönderiliyor...');
-                
-                // Ses dosyasını kontrol et
-                console.log('Ses dosyası boyutu:', audioBlob.size);
-                console.log('Ses dosyası tipi:', audioBlob.type);
                 
                 const response = await fetch('/process_audio', {
                     method: 'POST',
@@ -1062,6 +1234,7 @@
                 });
 
                 if (!response.ok) {
+                    hideProcessingSteps();
                     const errorText = await response.text();
                     console.error('Sunucu yanıt detayı:', errorText);
                     throw new Error(`HTTP error! status: ${response.status}, detail: ${errorText}`);
@@ -1071,12 +1244,28 @@
                 console.log('Sunucu yanıtı:', data);
                 
                 if (data.success) {
+                    // Ses tanıma tamamlandı
+                    updateProcessingStep('transcribe', 'completed');
+                    updateProcessingStep('evaluate', 'active');
+
                     if (data.transcript) {
                         addMessageToChat('user', data.transcript);
                     }
+
+                    // Değerlendirme tamamlandı
+                    updateProcessingStep('evaluate', 'completed');
+                    updateProcessingStep('respond', 'active');
+
                     if (data.response) {
                         addMessageToChat('assistant', data.response);
-                        await speakResponse(data.response);
+                        isGPTSpeaking = true;
+                        updateAvatarState('speaking');
+                        
+                        // Yanıt hazır
+                        updateProcessingStep('respond', 'completed');
+                        setTimeout(() => {
+                            hideProcessingSteps();
+                        }, 1000);
                     }
                     
                     if (data.interview_completed) {
@@ -1084,6 +1273,7 @@
                         await endInterview();
                     }
                 } else {
+                    hideProcessingSteps();
                     showError(data.error || 'Ses işlenemedi');
                     
                     if (!data.continue_listening) {
@@ -1092,14 +1282,96 @@
                     }
                 }
             } catch (error) {
+                hideProcessingSteps();
                 console.error('Sunucu hatası:', error);
                 showError('Sunucu ile iletişim hatası: ' + error.message);
                 
-                // Hata durumunda ses sistemini yeniden başlat
                 isMediaRecorderReady = false;
                 if (isAutoMode) {
                     await initAudio();
                     startVoiceDetection();
+                }
+            }
+        }
+
+        function showProcessingSteps() {
+            if (!document.querySelector('.processing-steps')) {
+                const stepsDiv = document.createElement('div');
+                stepsDiv.className = 'processing-steps';
+                stepsDiv.innerHTML = `
+                    <div class="processing-step" data-step="transcribe">
+                        <i class="fas fa-microphone"></i>
+                        <span>Ses tanınıyor...</span>
+                    </div>
+                    <div class="processing-step" data-step="evaluate">
+                        <i class="fas fa-brain"></i>
+                        <span>Değerlendiriliyor...</span>
+                    </div>
+                    <div class="processing-step" data-step="respond">
+                        <i class="fas fa-comment"></i>
+                        <span>Yanıt hazırlanıyor...</span>
+                    </div>
+                `;
+                document.body.appendChild(stepsDiv);
+            }
+
+            const stepsElement = document.querySelector('.processing-steps');
+            stepsElement.style.display = 'block';
+            
+            // Status indicator'ı yukarı kaydır
+            const statusIndicator = document.querySelector('.status-indicator');
+            if (statusIndicator) {
+                statusIndicator.style.bottom = '160px';
+            }
+        }
+
+        function hideProcessingSteps() {
+            const stepsElement = document.querySelector('.processing-steps');
+            if (stepsElement) {
+                stepsElement.style.display = 'none';
+                // Tüm adımları sıfırla
+                document.querySelectorAll('.processing-step').forEach(step => {
+                    step.className = 'processing-step';
+                });
+                
+                // Status indicator'ı eski konumuna getir
+                const statusIndicator = document.querySelector('.status-indicator');
+                if (statusIndicator) {
+                    statusIndicator.style.bottom = '80px';
+                }
+            }
+        }
+
+        function updateProcessingStep(stepName, status) {
+            const step = document.querySelector(`.processing-step[data-step="${stepName}"]`);
+            if (step) {
+                // Önce mevcut sınıfları temizle
+                step.className = 'processing-step';
+                
+                // Yeni durumu ekle
+                step.classList.add(status);
+                
+                // İkonu güncelle
+                const icon = step.querySelector('i');
+                if (icon) {
+                    if (status === 'active') {
+                        icon.className = 'fas fa-spinner step-spinner';
+                    } else if (status === 'completed') {
+                        icon.className = 'fas fa-check text-green-500';
+                    } else {
+                        // Varsayılan ikonları geri yükle
+                        switch(stepName) {
+                            case 'transcribe':
+                                icon.className = 'fas fa-microphone';
+                                break;
+                            case 'evaluate':
+                                icon.className = 'fas fa-brain';
+                                break;
+                            case 'respond':
+                                icon.className = 'fas fa-comment';
+                                break;
+                        }
+                    }
                 }
             }
         }
@@ -1170,32 +1442,48 @@
         }
 
         function addMessageToChat(role, message) {
-            const chatContainer = document.getElementById('messages');
-            
-            // Önceki aktif baloncukları kaldır
-            const activeMessages = document.querySelectorAll('.chat-bubble.active');
-            activeMessages.forEach(msg => {
+            // Önceki mesajları temizle
+            const existingMessages = document.querySelectorAll(`.chat-bubble.${role}-bubble`);
+            existingMessages.forEach(msg => {
                 msg.classList.add('fade-out');
                 setTimeout(() => msg.remove(), 300);
             });
 
-            // Yeni baloncuk oluştur
+            // Yeni mesaj oluştur
             const messageDiv = document.createElement('div');
-            const position = Math.floor(Math.random() * 6) + 1;
-            messageDiv.className = `chat-bubble ${role}-bubble position-${position}`;
-            messageDiv.textContent = message;
-
+            messageDiv.className = `chat-bubble ${role}-bubble`;
+            
+            // Mesaj içeriği
+            const content = document.createElement('div');
+            content.className = 'message-content';
+            
+            // İkon container
+            const iconContainer = document.createElement('div');
+            iconContainer.className = 'message-icon';
+            iconContainer.innerHTML = `<i class="fas fa-${role === 'assistant' ? 'robot' : 'user'} text-lg"></i>`;
+            
+            // Mesaj metni
+            const textContainer = document.createElement('div');
+            textContainer.className = 'message-text';
+            textContainer.textContent = message;
+            
+            // Elementleri birleştir
+            content.appendChild(iconContainer);
+            content.appendChild(textContainer);
+            messageDiv.appendChild(content);
+            
+            // Mesajı ekle
+            const chatContainer = document.getElementById('messages');
             chatContainer.appendChild(messageDiv);
             
             // Animasyon için timeout
-            setTimeout(() => {
+            requestAnimationFrame(() => {
                 messageDiv.classList.add('active');
-            }, 50);
+            });
 
+            // Robot animasyonunu güncelle
             if (role === 'assistant') {
-                const avatar = document.getElementById('aivaAvatar');
-                avatar.classList.add('speaking');
-                setTimeout(() => avatar.classList.remove('speaking'), 1000);
+                updateAvatarState('speaking');
             }
         }
 

@@ -11,5 +11,16 @@
   ],
   "status": "in_progress",
   "created_at": "2025-02-03T20:16:41.764550",
-  "updated_at": "2025-02-03T20:24:13.041031"
+  "updated_at": "2025-02-03T20:24:13.041031",
+  "conversation_history": [
+    {
+      "role": "user",
+      "content": "Merhaba nasılsın, iyi misin?"
+    },
+    {
+      "role": "assistant",
+      "content": "Merhaba Nisa Hanım, ben de iyiyim, teşekkür ederim. Bugün sizinle tanışmak çok güzel. Müsait olduğunuzda mülakata başlayabiliriz. İlk sorum şu olacak: Yapay zekada kullanılan temel algoritmalar hakkında bilgi verebilir misiniz? Özellikle hangi algoritmalar üzerinde daha fazla deneyiminiz var?"
+    }
+  ],
+  "current_question_index": 1
 }

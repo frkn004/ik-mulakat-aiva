@@ -1,0 +1,110 @@
+2025-02-09 23:58:03,845 - WARNING -  * Debugger is active!
+2025-02-09 23:58:03,856 - INFO -  * Debugger PIN: 378-644-872
+2025-02-09 23:58:40,661 - INFO - Device 0: MacBook Pro Mikrofonu
+2025-02-09 23:58:40,661 - INFO - Device 1: MacBook Pro Hoparlörü
+2025-02-09 23:58:40,661 - INFO - Device 2: Microsoft Teams Audio
+2025-02-09 23:58:40,661 - INFO - 127.0.0.1 - - [09/Feb/2025 23:58:40] "GET /test_audio HTTP/1.1" 200 -
+2025-02-09 23:58:43,613 - DEBUG - Using selector: KqueueSelector
+2025-02-09 23:58:44,363 - ERROR - Token alma hatası: 404 - <html>
+<head><title>404 Not Found</title></head>
+<body>
+<center><h1>404 Not Found</h1></center>
+<hr><center>nginx</center>
+</body>
+</html>
+
+2025-02-09 23:58:44,366 - INFO - 127.0.0.1 - - [09/Feb/2025 23:58:44] "[31m[1mGET /get_token HTTP/1.1[0m" 400 -
+2025-02-09 23:58:47,214 - INFO - Kayıt başlıyor...
+2025-02-09 23:58:47,214 - INFO - 
+Kullanılabilir ses cihazları:
+2025-02-09 23:58:47,214 - INFO - Device 0: MacBook Pro Mikrofonu
+2025-02-09 23:58:47,214 - INFO - Device 1: MacBook Pro Hoparlörü
+2025-02-09 23:58:47,214 - INFO - Device 2: Microsoft Teams Audio
+2025-02-09 23:58:47,214 - INFO - 
+Varsayılan giriş cihazı: MacBook Pro Mikrofonu
+2025-02-09 23:58:47,299 - INFO - Kayıt başlatıldı
+2025-02-09 23:58:47,641 - DEBUG - Sessizlik başladı...
+2025-02-09 23:58:49,178 - INFO - Sessizlik süresi aşıldı
+2025-02-09 23:58:49,385 - INFO - Kayıt durduruldu
+2025-02-09 23:58:49,386 - INFO - Ses dosyası kaydedildi: recording_20250209_235849.wav
+2025-02-09 23:58:49,393 - DEBUG - Starting new HTTPS connection (1): api.openai.com:443
+2025-02-09 23:58:49,408 - DEBUG - NativeEvent(path="/Users/furkansevinc/PycharmProjects/mülakat-aiva/recording_20250209_235849.wav", inode=31410061, flags=19100, id=479052009): is_created, is_file, is_modified, is_xattr_mod
+2025-02-09 23:58:49,408 - DEBUG - queue_event FileCreatedEvent(src_path='/Users/furkansevinc/PycharmProjects/mülakat-aiva/recording_20250209_235849.wav', dest_path='', event_type='created', is_directory=False, is_synthetic=False)
+2025-02-09 23:58:49,409 - DEBUG - queue_event DirModifiedEvent(src_path='/Users/furkansevinc/PycharmProjects/mülakat-aiva', dest_path='', event_type='modified', is_directory=True, is_synthetic=False)
+2025-02-09 23:58:49,409 - DEBUG - queue_event FileModifiedEvent(src_path='/Users/furkansevinc/PycharmProjects/mülakat-aiva/recording_20250209_235849.wav', dest_path='', event_type='modified', is_directory=False, is_synthetic=False)
+2025-02-09 23:58:50,506 - DEBUG - https://api.openai.com:443 "POST /v1/audio/transcriptions HTTP/1.1" 200 None
+2025-02-09 23:58:50,508 - INFO - Transkripsiyon başarılı: {'text': 'Selamünaleyküm komisyon, hoşgeldin.'}
+2025-02-09 23:58:50,508 - INFO - 127.0.0.1 - - [09/Feb/2025 23:58:50] "POST /start_recording HTTP/1.1" 200 -
+2025-02-10 00:00:15,482 - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on http://127.0.0.1:5001
+2025-02-10 00:00:15,482 - INFO - [33mPress CTRL+C to quit[0m
+2025-02-10 00:00:15,488 - INFO -  * Restarting with watchdog (fsevents)
+2025-02-10 00:00:15,830 - WARNING -  * Debugger is active!
+2025-02-10 00:00:15,836 - INFO -  * Debugger PIN: 378-644-872
+2025-02-10 00:00:33,164 - INFO - Device 0: MacBook Pro Mikrofonu
+2025-02-10 00:00:33,164 - INFO - Device 1: MacBook Pro Hoparlörü
+2025-02-10 00:00:33,164 - INFO - Device 2: Microsoft Teams Audio
+2025-02-10 00:00:33,165 - INFO - 127.0.0.1 - - [10/Feb/2025 00:00:33] "GET /test_audio HTTP/1.1" 200 -
+2025-02-10 00:00:48,633 - INFO - 127.0.0.1 - - [10/Feb/2025 00:00:48] "[31m[1mGET /start_recording HTTP/1.1[0m" 405 -
+2025-02-10 00:00:56,970 - INFO - Kayıt başlıyor...
+2025-02-10 00:00:56,970 - INFO - 
+Kullanılabilir ses cihazları:
+2025-02-10 00:00:56,970 - INFO - Device 0: MacBook Pro Mikrofonu
+2025-02-10 00:00:56,970 - INFO - Device 1: MacBook Pro Hoparlörü
+2025-02-10 00:00:56,970 - INFO - Device 2: Microsoft Teams Audio
+2025-02-10 00:00:56,970 - INFO - 
+Varsayılan giriş cihazı: MacBook Pro Mikrofonu
+2025-02-10 00:00:57,058 - INFO - Kayıt başlatıldı
+2025-02-10 00:00:57,400 - DEBUG - Sessizlik başladı...
+2025-02-10 00:00:58,936 - INFO - Sessizlik süresi aşıldı
+2025-02-10 00:00:59,142 - INFO - Kayıt durduruldu
+2025-02-10 00:00:59,143 - INFO - Ses dosyası kaydedildi: recording_20250210_000059.wav
+2025-02-10 00:00:59,147 - DEBUG - Starting new HTTPS connection (1): api.openai.com:443
+2025-02-10 00:00:59,165 - DEBUG - NativeEvent(path="/Users/furkansevinc/PycharmProjects/mülakat-aiva/recording_20250210_000059.wav", inode=31410460, flags=19100, id=479058089): is_created, is_file, is_modified, is_xattr_mod
+2025-02-10 00:00:59,165 - DEBUG - queue_event FileCreatedEvent(src_path='/Users/furkansevinc/PycharmProjects/mülakat-aiva/recording_20250210_000059.wav', dest_path='', event_type='created', is_directory=False, is_synthetic=False)
+2025-02-10 00:00:59,165 - DEBUG - queue_event DirModifiedEvent(src_path='/Users/furkansevinc/PycharmProjects/mülakat-aiva', dest_path='', event_type='modified', is_directory=True, is_synthetic=False)
+2025-02-10 00:00:59,166 - DEBUG - queue_event FileModifiedEvent(src_path='/Users/furkansevinc/PycharmProjects/mülakat-aiva/recording_20250210_000059.wav', dest_path='', event_type='modified', is_directory=False, is_synthetic=False)
+2025-02-10 00:01:00,758 - DEBUG - https://api.openai.com:443 "POST /v1/audio/transcriptions HTTP/1.1" 200 46
+2025-02-10 00:01:00,760 - INFO - Transkripsiyon başarılı: {'text': 'Ben gözüm takıldı şeye kaydım'}
+2025-02-10 00:01:00,761 - INFO - 127.0.0.1 - - [10/Feb/2025 00:01:00] "POST /start_recording HTTP/1.1" 200 -
+2025-02-10 00:04:36,362 - DEBUG - NativeEvent(path="/Users/furkansevinc/PycharmProjects/mülakat-aiva/app.py", inode=31361641, flags=10400, id=479064989): is_file, is_inode_meta_mod
+2025-02-10 00:04:36,362 - DEBUG - queue_event FileModifiedEvent(src_path='/Users/furkansevinc/PycharmProjects/mülakat-aiva/app.py', dest_path='', event_type='modified', is_directory=False, is_synthetic=False)
+2025-02-10 00:04:36,363 - INFO -  * Detected change in '/Users/furkansevinc/PycharmProjects/mülakat-aiva/app.py', reloading
+2025-02-10 00:04:36,372 - DEBUG - NativeEvent(path="/Users/furkansevinc/PycharmProjects/mülakat-aiva/app.py", inode=31361641, flags=11400, id=479064992): is_file, is_inode_meta_mod, is_modified
+2025-02-10 00:04:36,372 - DEBUG - queue_event FileModifiedEvent(src_path='/Users/furkansevinc/PycharmProjects/mülakat-aiva/app.py', dest_path='', event_type='modified', is_directory=False, is_synthetic=False)
+2025-02-10 00:04:36,372 - INFO -  * Detected change in '/Users/furkansevinc/PycharmProjects/mülakat-aiva/app.py', reloading
+2025-02-10 00:04:36,447 - INFO -  * Restarting with watchdog (fsevents)
+2025-02-10 00:04:36,844 - WARNING -  * Debugger is active!
+2025-02-10 00:04:36,851 - INFO -  * Debugger PIN: 378-644-872
+2025-02-10 00:04:54,798 - DEBUG - NativeEvent(path="/Users/furkansevinc/PycharmProjects/mülakat-aiva/app.py", inode=31361641, flags=11400, id=479065450): is_file, is_inode_meta_mod, is_modified
+2025-02-10 00:04:54,798 - DEBUG - queue_event FileModifiedEvent(src_path='/Users/furkansevinc/PycharmProjects/mülakat-aiva/app.py', dest_path='', event_type='modified', is_directory=False, is_synthetic=False)
+2025-02-10 00:04:54,798 - INFO -  * Detected change in '/Users/furkansevinc/PycharmProjects/mülakat-aiva/app.py', reloading
+2025-02-10 00:04:55,157 - INFO -  * Restarting with watchdog (fsevents)
+2025-02-10 00:04:55,474 - WARNING -  * Debugger is active!
+2025-02-10 00:04:55,480 - INFO -  * Debugger PIN: 378-644-872
+2025-02-10 00:05:29,666 - DEBUG - NativeEvent(path="/Users/furkansevinc/PycharmProjects/mülakat-aiva/app.py", inode=31361641, flags=11400, id=479065730): is_file, is_inode_meta_mod, is_modified
+2025-02-10 00:05:29,666 - DEBUG - queue_event FileModifiedEvent(src_path='/Users/furkansevinc/PycharmProjects/mülakat-aiva/app.py', dest_path='', event_type='modified', is_directory=False, is_synthetic=False)
+2025-02-10 00:05:29,666 - INFO -  * Detected change in '/Users/furkansevinc/PycharmProjects/mülakat-aiva/app.py', reloading
+2025-02-10 00:05:29,957 - INFO -  * Restarting with watchdog (fsevents)
+2025-02-10 00:05:30,251 - WARNING -  * Debugger is active!
+2025-02-10 00:05:30,257 - INFO -  * Debugger PIN: 378-644-872
+2025-02-10 00:06:18,790 - DEBUG - NativeEvent(path="/Users/furkansevinc/PycharmProjects/mülakat-aiva/app.py", inode=31361641, flags=11400, id=479067165): is_file, is_inode_meta_mod, is_modified
+2025-02-10 00:06:18,790 - DEBUG - queue_event FileModifiedEvent(src_path='/Users/furkansevinc/PycharmProjects/mülakat-aiva/app.py', dest_path='', event_type='modified', is_directory=False, is_synthetic=False)
+2025-02-10 00:06:18,791 - INFO -  * Detected change in '/Users/furkansevinc/PycharmProjects/mülakat-aiva/app.py', reloading
+2025-02-10 00:06:18,908 - INFO -  * Restarting with watchdog (fsevents)
+2025-02-10 00:06:19,210 - WARNING -  * Debugger is active!
+2025-02-10 00:06:19,215 - INFO -  * Debugger PIN: 378-644-872
+2025-02-10 00:06:31,811 - DEBUG - NativeEvent(path="/Users/furkansevinc/PycharmProjects/mülakat-aiva/requirements.txt", inode=28397990, flags=11400, id=479067317): is_file, is_inode_meta_mod, is_modified
+2025-02-10 00:06:31,811 - DEBUG - queue_event FileModifiedEvent(src_path='/Users/furkansevinc/PycharmProjects/mülakat-aiva/requirements.txt', dest_path='', event_type='modified', is_directory=False, is_synthetic=False)
+2025-02-10 00:08:58,122 - DEBUG - NativeEvent(path="/Users/furkansevinc/PycharmProjects/mülakat-aiva/app.py", inode=31361641, flags=11400, id=479075691): is_file, is_inode_meta_mod, is_modified
+2025-02-10 00:08:58,122 - DEBUG - queue_event FileModifiedEvent(src_path='/Users/furkansevinc/PycharmProjects/mülakat-aiva/app.py', dest_path='', event_type='modified', is_directory=False, is_synthetic=False)
+2025-02-10 00:08:58,123 - INFO -  * Detected change in '/Users/furkansevinc/PycharmProjects/mülakat-aiva/app.py', reloading
+2025-02-10 00:08:58,423 - INFO -  * Restarting with watchdog (fsevents)
+2025-02-10 00:08:58,961 - WARNING -  * Debugger is active!
+2025-02-10 00:08:58,968 - INFO -  * Debugger PIN: 378-644-872
+2025-02-10 00:08:59,738 - DEBUG - NativeEvent(path="/Users/furkansevinc/PycharmProjects/mülakat-aiva/app.py", inode=31361641, flags=11400, id=479075813): is_file, is_inode_meta_mod, is_modified
+2025-02-10 00:08:59,738 - DEBUG - queue_event FileModifiedEvent(src_path='/Users/furkansevinc/PycharmProjects/mülakat-aiva/app.py', dest_path='', event_type='modified', is_directory=False, is_synthetic=False)
+2025-02-10 00:08:59,738 - INFO -  * Detected change in '/Users/furkansevinc/PycharmProjects/mülakat-aiva/app.py', reloading
+2025-02-10 00:09:00,037 - INFO -  * Restarting with watchdog (fsevents)
+2025-02-10 00:09:00,327 - WARNING -  * Debugger is active!
+2025-02-10 00:09:00,332 - INFO -  * Debugger PIN: 378-644-872
