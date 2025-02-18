@@ -173,26 +173,48 @@ class VoiceAssistant:
         return filename
 
     async def transcribe_audio(self, audio_file):
-        """Ses dosyasını metne çevir"""
         try:
-            logger.info(f"Ses dosyası transkript ediliyor: {audio_file}")
+            logger.debug("Ses tanıma başlıyor...")
             
-            # Whisper API'yi çağır
-            with open(audio_file, "rb") as file:
-                transcript = openai_client.audio.transcriptions.create(
+            # WebM'den WAV'a dönüştür
+            converted_file = 'temp/temp_converted.wav'
+            ffmpeg_command = [
+                'ffmpeg', '-y',
+                '-i', audio_file,
+                '-acodec', 'pcm_s16le',
+                '-ac', '1',
+                '-ar', '48000',
+                converted_file
+            ]
+            
+            try:
+                subprocess.run(ffmpeg_command, check=True, capture_output=True)
+                logger.info("WebM dosyası WAV formatına dönüştürüldü")
+            except subprocess.CalledProcessError as e:
+                logger.error(f"FFmpeg dönüştürme hatası: {e.stderr.decode()}")
+                return None
+
+            # OpenAI Whisper API kullanarak ses tanıma
+            with open(converted_file, 'rb') as audio:
+                transcript = self.openai_client.audio.transcriptions.create(
                     model="whisper-1",
-                    file=file,
-                    language="tr",
-                    temperature=0.3,
-                    response_format="text",
-                    prompt="Bu bir mülakat konuşmasıdır. Doğal ve akıcı Türkçe cümleler beklenmektedir."
+                    file=audio,
+                    language="tr"
                 )
+
+            # Geçici dosyaları temizle
+            for temp_file in [converted_file]:
+                if os.path.exists(temp_file):
+                    try:
+                        os.remove(temp_file)
+                        logger.info(f"Geçici dosya silindi: {temp_file}")
+                    except Exception as e:
+                        logger.warning(f"Geçici dosya silme hatası: {str(e)}")
             
-            logger.info(f"Transkript başarılı: {transcript}")
-            return transcript.strip()
+            return transcript.text.strip()
             
         except Exception as e:
-            logger.error(f"Transkript hatası: {str(e)}")
+            logger.error(f"Ses tanıma hatası: {str(e)}")
             return None
 
     async def generate_and_play_speech(self, text):
@@ -1034,7 +1056,8 @@ async def process_audio():
                 logger.warning("Ses tanıma başarısız oldu")
                 return jsonify({
                     'success': False,
-                    'error': 'Ses tanınamadı'
+                    'error': 'Ses tanınamadı',
+                    'continue_listening': True  # Dinlemeye devam et
                 })
 
             logger.info(f"Tanınan metin: {transcript}")
@@ -1045,7 +1068,8 @@ async def process_audio():
                 logger.warning("GPT yanıtı alınamadı")
                 return jsonify({
                     'success': False,
-                    'error': 'GPT yanıtı alınamadı'
+                    'error': 'GPT yanıtı alınamadı',
+                    'continue_listening': True  # Dinlemeye devam et
                 })
 
             logger.info(f"GPT yanıtı: {gpt_response}")
@@ -1055,7 +1079,8 @@ async def process_audio():
                 'success': True,
                 'transcript': transcript,
                 'response': gpt_response,
-                'interview_ended': is_interview_ended
+                'interview_ended': is_interview_ended,
+                'continue_listening': True  # Her zaman dinlemeye devam et
             }
 
             # Ses dosyasını arka planda oluştur ve çal
@@ -1083,7 +1108,8 @@ async def process_audio():
             logger.error(f"Ses işleme hatası: {str(e)}")
             return jsonify({
                 'success': False,
-                'error': 'Ses işlenemedi'
+                'error': 'Ses işlenemedi',
+                'continue_listening': True  # Hata durumunda bile dinlemeye devam et
             })
 
         finally:
@@ -1099,7 +1125,8 @@ async def process_audio():
         logger.error(f"Genel hata: {str(e)}")
         return jsonify({
             'success': False,
-            'error': str(e)
+            'error': str(e),
+            'continue_listening': True  # Genel hata durumunda bile dinlemeye devam et
         })
 
 @app.route('/generate_report', methods=['POST'])
