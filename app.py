@@ -173,48 +173,26 @@ class VoiceAssistant:
         return filename
 
     async def transcribe_audio(self, audio_file):
+        """Ses dosyasını metne çevir"""
         try:
-            logger.debug("Ses tanıma başlıyor...")
+            logger.info(f"Ses dosyası transkript ediliyor: {audio_file}")
             
-            # WebM'den WAV'a dönüştür
-            converted_file = 'temp/temp_converted.wav'
-            ffmpeg_command = [
-                'ffmpeg', '-y',
-                '-i', audio_file,
-                '-acodec', 'pcm_s16le',
-                '-ac', '1',
-                '-ar', '48000',
-                converted_file
-            ]
-            
-            try:
-                subprocess.run(ffmpeg_command, check=True, capture_output=True)
-                logger.info("WebM dosyası WAV formatına dönüştürüldü")
-            except subprocess.CalledProcessError as e:
-                logger.error(f"FFmpeg dönüştürme hatası: {e.stderr.decode()}")
-                return None
-
-            # OpenAI Whisper API kullanarak ses tanıma
-            with open(converted_file, 'rb') as audio:
-                transcript = self.openai_client.audio.transcriptions.create(
+            # Whisper API'yi çağır
+            with open(audio_file, "rb") as file:
+                transcript = openai_client.audio.transcriptions.create(
                     model="whisper-1",
-                    file=audio,
-                    language="tr"
+                    file=file,
+                    language="tr",
+                    temperature=0.3,
+                    response_format="text",
+                    prompt="Bu bir mülakat konuşmasıdır. Doğal ve akıcı Türkçe cümleler beklenmektedir."
                 )
-
-            # Geçici dosyaları temizle
-            for temp_file in [converted_file]:
-                if os.path.exists(temp_file):
-                    try:
-                        os.remove(temp_file)
-                        logger.info(f"Geçici dosya silindi: {temp_file}")
-                    except Exception as e:
-                        logger.warning(f"Geçici dosya silme hatası: {str(e)}")
             
-            return transcript.text.strip()
+            logger.info(f"Transkript başarılı: {transcript}")
+            return transcript.strip()
             
         except Exception as e:
-            logger.error(f"Ses tanıma hatası: {str(e)}")
+            logger.error(f"Transkript hatası: {str(e)}")
             return None
 
     async def generate_and_play_speech(self, text):

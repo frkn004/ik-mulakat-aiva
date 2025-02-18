@@ -849,10 +849,10 @@
         }
 
         // Ses seviyesi eşikleri
-        const SILENCE_THRESHOLD = 0.05;  // Sessizlik eşiği (app2.py'dan alındı)
-        const VOICE_THRESHOLD = 0.15;    // Konuşma başlangıç eşiği
-        const SILENCE_DURATION = 1500;   // Sessizlik süresi (ms)
-        const MIN_CONFIDENCE = 0.6;      // Minimum güven skoru
+        const VOICE_THRESHOLD = 0.12;    // Konuşma başlangıç eşiği (orta hassasiyet)
+        const SILENCE_THRESHOLD = 0.04;   // Sessizlik eşiği (düşük gürültü toleransı)
+        const SILENCE_DURATION = 1200;    // Sessizlik süresi (1.2 saniye)
+        const MIN_RECORDING_DURATION = 500; // Minimum kayıt süresi (0.5 saniye)
 
         async function initAudio() {
             try {
@@ -951,28 +951,39 @@
         function startVoiceDetection() {
             if (!analyser || !isAutoMode || isSpeaking || isGPTSpeaking || isProcessingUtterance) return;
             
-                const bufferLength = analyser.frequencyBinCount;
-                const dataArray = new Uint8Array(bufferLength);
-            
+            const bufferLength = analyser.frequencyBinCount;
+            const dataArray = new Uint8Array(bufferLength);
+            let recordingStartTime = null;
+
             function checkAudioLevel() {
                 if (!isAutoMode || isSpeaking || isGPTSpeaking || isProcessingUtterance) return;
                 
-                    analyser.getByteFrequencyData(dataArray);
-                    const average = dataArray.reduce((a, b) => a + b) / bufferLength;
+                analyser.getByteFrequencyData(dataArray);
+                const average = dataArray.reduce((a, b) => a + b) / bufferLength;
                 const volume = average / 128.0;
                 
                 updateVolumeIndicator(volume);
                 
+                // Konuşma başlangıcı
                 if (!isRecording && volume > VOICE_THRESHOLD) {
+                    recordingStartTime = Date.now();
                     startRecording();
-                } else if (isRecording && volume < SILENCE_THRESHOLD) {
+                } 
+                // Konuşma bitişi kontrolü
+                else if (isRecording && volume < SILENCE_THRESHOLD) {
                     if (!silenceStart) {
                         silenceStart = Date.now();
-                    } else if (Date.now() - silenceStart > SILENCE_DURATION) {
+                    } 
+                    // Minimum kayıt süresini ve sessizlik süresini kontrol et
+                    else if (Date.now() - silenceStart > SILENCE_DURATION && 
+                            Date.now() - recordingStartTime > MIN_RECORDING_DURATION) {
                         stopRecording();
                         silenceStart = null;
+                        recordingStartTime = null;
                     }
-                } else {
+                } 
+                // Ses devam ediyor
+                else {
                     silenceStart = null;
                 }
                 
@@ -1143,6 +1154,8 @@
                     isGPTSpeaking = true;
                     updateStatus('GPT yanıt veriyor...', 'speaking');
                     updateAvatarState('speaking');
+                    // Konuşma başladığında mesajı ekle
+                    addMessageToChat('assistant', text);
                 };
                 
                 utterance.onend = async () => {
@@ -1250,6 +1263,8 @@
 
                     if (data.transcript) {
                         addMessageToChat('user', data.transcript);
+                        // Değerlendirme için bekle
+                        await new Promise(resolve => setTimeout(resolve, 1000));
                     }
 
                     // Değerlendirme tamamlandı
@@ -1257,15 +1272,19 @@
                     updateProcessingStep('respond', 'active');
 
                     if (data.response) {
-                        addMessageToChat('assistant', data.response);
-                        isGPTSpeaking = true;
-                        updateAvatarState('speaking');
+                        // Yanıt hazırlanıyor aşamasında biraz bekle
+                        await new Promise(resolve => setTimeout(resolve, 1000));
                         
                         // Yanıt hazır
                         updateProcessingStep('respond', 'completed');
-                        setTimeout(() => {
-                            hideProcessingSteps();
-                        }, 1000);
+                        
+                        // Yanıtı seslendirmeye başla
+                        isGPTSpeaking = true;
+                        updateAvatarState('speaking');
+                        
+                        // İşlem adımlarını kaldırmadan önce biraz bekle
+                        await new Promise(resolve => setTimeout(resolve, 1000));
+                        hideProcessingSteps();
                     }
                     
                     if (data.interview_completed) {
