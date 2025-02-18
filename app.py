@@ -2067,6 +2067,61 @@ async def save_interview_state():
             'error': str(e)
         }), 500
 
+@app.route('/get_speech', methods=['GET'])
+async def get_speech():
+    try:
+        text = request.args.get('text')
+        if not text:
+            return 'Text parameter is required', 400
+
+        # Geçici ses dosyası için benzersiz bir isim oluştur
+        temp_filename = f"temp/speech_{int(time.time())}_{random.randint(100000, 999999)}.mp3"
+        
+        try:
+            # OpenAI TTS ile sesi oluştur
+            tts_response = openai_client.audio.speech.create(
+                model="tts-1",
+                voice="shimmer",
+                input=text
+            )
+            
+            # Ses dosyasını kaydet
+            tts_response.stream_to_file(temp_filename)
+            
+            # Dosyayı oku ve yanıt olarak gönder
+            def generate():
+                with open(temp_filename, 'rb') as f:
+                    while chunk := f.read(8192):
+                        yield chunk
+                # Dosyayı sil
+                if os.path.exists(temp_filename):
+                    os.remove(temp_filename)
+            
+            return Response(
+                generate(),
+                mimetype='audio/mpeg',
+                headers={
+                    'Content-Disposition': 'inline',
+                    'Cache-Control': 'no-cache'
+                }
+            )
+            
+        except Exception as e:
+            logger.error(f"TTS hatası: {str(e)}")
+            if os.path.exists(temp_filename):
+                os.remove(temp_filename)
+            return jsonify({
+                'success': False,
+                'error': 'Ses oluşturulamadı'
+            }), 500
+            
+    except Exception as e:
+        logger.error(f"Ses endpoint hatası: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
 if __name__ == '__main__':
     try:
         print("\n=== AIVA Mülakat Sistemi Başlatılıyor ===")
