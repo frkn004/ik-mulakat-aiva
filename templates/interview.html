@@ -633,7 +633,7 @@
         <!-- AIVA Avatar -->
         <div class="aiva-avatar" id="aivaAvatar">
             <div class="avatar-effect" id="avatarEffect"></div>
-            <i class="fas fa-robot text-white text-7xl"></i>
+            <i class="fas fa-smile-beam text-white text-7xl"></i>
         </div>
 
         <!-- Chat Messages -->
@@ -1294,17 +1294,26 @@
                             hideProcessingSteps();
                         }, 1000);
 
-                        // GPT konuşması bittiğinde ses algılamayı yeniden başlat
-                        setTimeout(async () => {
+                        // Web Audio API ile sesi çal
+                        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                        const response = await fetch(`/get_speech?text=${encodeURIComponent(data.response)}`);
+                        const audioData = await response.arrayBuffer();
+                        const audioBuffer = await audioContext.decodeAudioData(audioData);
+                        const source = audioContext.createBufferSource();
+                        source.buffer = audioBuffer;
+                        source.connect(audioContext.destination);
+                        
+                        source.onended = () => {
                             console.log('GPT konuşması bitti, ses algılama yeniden başlatılıyor...');
                             isGPTSpeaking = false;
                             if (isAutoMode && !interviewEnded) {
                                 updateAvatarState('listening');
                                 updateStatus('Sesinizi bekliyorum...', 'auto');
-                                await initAudio();
                                 startVoiceDetection();
                             }
-                        }, 3000); // GPT'nin konuşmasının bitmesi için biraz daha uzun bir süre bekle
+                        };
+                        
+                        source.start(0);
                     }
                     
                     if (data.interview_ended) {
@@ -1322,7 +1331,6 @@
                             if (isAutoMode) {
                                 updateAvatarState('listening');
                                 updateStatus('Sesinizi bekliyorum...', 'auto');
-                                await initAudio();
                                 startVoiceDetection();
                             }
                         }, 1000);
@@ -1340,7 +1348,6 @@
                         if (isAutoMode) {
                             updateAvatarState('listening');
                             updateStatus('Sesinizi bekliyorum...', 'auto');
-                            await initAudio();
                             startVoiceDetection();
                         }
                     }, 1000);
