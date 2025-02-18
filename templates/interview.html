@@ -849,10 +849,10 @@
         }
 
         // Ses seviyesi eşikleri
-        const VOICE_THRESHOLD = 0.12;    // Konuşma başlangıç eşiği (orta hassasiyet)
-        const SILENCE_THRESHOLD = 0.04;   // Sessizlik eşiği (düşük gürültü toleransı)
-        const SILENCE_DURATION = 1200;    // Sessizlik süresi (1.2 saniye)
-        const MIN_RECORDING_DURATION = 500; // Minimum kayıt süresi (0.5 saniye)
+        const SILENCE_THRESHOLD = 0.05;  // Sessizlik eşiği (app2.py'dan alındı)
+        const VOICE_THRESHOLD = 0.15;    // Konuşma başlangıç eşiği
+        const SILENCE_DURATION = 1500;   // Sessizlik süresi (ms)
+        const MIN_CONFIDENCE = 0.6;      // Minimum güven skoru
 
         async function initAudio() {
             try {
@@ -949,14 +949,29 @@
         }
 
         function startVoiceDetection() {
-            if (!analyser || !isAutoMode || isSpeaking || isGPTSpeaking || isProcessingUtterance) return;
+            if (!analyser || !isAutoMode || isGPTSpeaking || interviewEnded) {
+                console.log('Ses algılama başlatılamıyor:', {
+                    analyserExists: !!analyser,
+                    isAutoMode,
+                    isGPTSpeaking,
+                    interviewEnded
+                });
+                return;
+            }
             
+            console.log('Ses algılama başlatılıyor...');
             const bufferLength = analyser.frequencyBinCount;
             const dataArray = new Uint8Array(bufferLength);
-            let recordingStartTime = null;
-
+            
             function checkAudioLevel() {
-                if (!isAutoMode || isSpeaking || isGPTSpeaking || isProcessingUtterance) return;
+                if (!isAutoMode || isGPTSpeaking || interviewEnded) {
+                    console.log('Ses algılama durduruluyor:', {
+                        isAutoMode,
+                        isGPTSpeaking,
+                        interviewEnded
+                    });
+                    return;
+                }
                 
                 analyser.getByteFrequencyData(dataArray);
                 const average = dataArray.reduce((a, b) => a + b) / bufferLength;
@@ -964,31 +979,29 @@
                 
                 updateVolumeIndicator(volume);
                 
-                // Konuşma başlangıcı
-                if (!isRecording && volume > VOICE_THRESHOLD) {
-                    recordingStartTime = Date.now();
+                if (!isRecording && !isGPTSpeaking && volume > VOICE_THRESHOLD) {
+                    console.log('Ses algılandı, kayıt başlatılıyor...');
                     startRecording();
-                } 
-                // Konuşma bitişi kontrolü
-                else if (isRecording && volume < SILENCE_THRESHOLD) {
+                } else if (isRecording && volume < SILENCE_THRESHOLD) {
                     if (!silenceStart) {
                         silenceStart = Date.now();
-                    } 
-                    // Minimum kayıt süresini ve sessizlik süresini kontrol et
-                    else if (Date.now() - silenceStart > SILENCE_DURATION && 
-                            Date.now() - recordingStartTime > MIN_RECORDING_DURATION) {
+                    } else if (Date.now() - silenceStart > SILENCE_DURATION) {
+                        console.log('Sessizlik algılandı, kayıt durduruluyor...');
                         stopRecording();
                         silenceStart = null;
-                        recordingStartTime = null;
                     }
-                } 
-                // Ses devam ediyor
-                else {
+                } else {
                     silenceStart = null;
                 }
                 
-                if (isAutoMode && !isSpeaking && !isGPTSpeaking && !isProcessingUtterance) {
+                if (isAutoMode && !isGPTSpeaking && !interviewEnded) {
                     requestAnimationFrame(checkAudioLevel);
+                } else {
+                    console.log('Ses algılama döngüsü sonlandırıldı:', {
+                        isAutoMode,
+                        isGPTSpeaking,
+                        interviewEnded
+                    });
                 }
             }
             
@@ -1154,8 +1167,6 @@
                     isGPTSpeaking = true;
                     updateStatus('GPT yanıt veriyor...', 'speaking');
                     updateAvatarState('speaking');
-                    // Konuşma başladığında mesajı ekle
-                    addMessageToChat('assistant', text);
                 };
                 
                 utterance.onend = async () => {
@@ -1221,7 +1232,7 @@
 
         async function sendAudioToServer(audioBlob) {
             try {
-                if (isSpeaking || isGPTSpeaking) {
+                if (isGPTSpeaking) {
                     console.log('GPT konuşuyor, ses kaydı işlenmeyecek');
                     return;
                 }
@@ -1263,8 +1274,6 @@
 
                     if (data.transcript) {
                         addMessageToChat('user', data.transcript);
-                        // Değerlendirme için bekle
-                        await new Promise(resolve => setTimeout(resolve, 1000));
                     }
 
                     // Değerlendirme tamamlandı
@@ -1272,22 +1281,33 @@
                     updateProcessingStep('respond', 'active');
 
                     if (data.response) {
-                        // Yanıt hazırlanıyor aşamasında biraz bekle
-                        await new Promise(resolve => setTimeout(resolve, 1000));
+                        // GPT konuşmaya başlamadan önce ses algılamayı durdur
+                        isGPTSpeaking = true;
+                        stopVoiceDetection();
+                        
+                        addMessageToChat('assistant', data.response);
+                        updateAvatarState('speaking');
                         
                         // Yanıt hazır
                         updateProcessingStep('respond', 'completed');
-                        
-                        // Yanıtı seslendirmeye başla
-                        isGPTSpeaking = true;
-                        updateAvatarState('speaking');
-                        
-                        // İşlem adımlarını kaldırmadan önce biraz bekle
-                        await new Promise(resolve => setTimeout(resolve, 1000));
-                        hideProcessingSteps();
+                        setTimeout(() => {
+                            hideProcessingSteps();
+                        }, 1000);
+
+                        // GPT konuşması bittiğinde ses algılamayı yeniden başlat
+                        setTimeout(async () => {
+                            console.log('GPT konuşması bitti, ses algılama yeniden başlatılıyor...');
+                            isGPTSpeaking = false;
+                            if (isAutoMode && !interviewEnded) {
+                                updateAvatarState('listening');
+                                updateStatus('Sesinizi bekliyorum...', 'auto');
+                                await initAudio();
+                                startVoiceDetection();
+                            }
+                        }, 3000); // GPT'nin konuşmasının bitmesi için biraz daha uzun bir süre bekle
                     }
                     
-                    if (data.interview_completed) {
+                    if (data.interview_ended) {
                         interviewEnded = true;
                         await endInterview();
                     }
@@ -1295,9 +1315,17 @@
                     hideProcessingSteps();
                     showError(data.error || 'Ses işlenemedi');
                     
-                    if (!data.continue_listening) {
-                        isAutoMode = false;
-                        updateStatus('Manuel moda geçildi (Space tuşunu kullanın)', 'manual');
+                    // Hata durumunda bile dinlemeye devam et
+                    if (data.continue_listening && !interviewEnded) {
+                        setTimeout(async () => {
+                            console.log('Hata sonrası ses algılama yeniden başlatılıyor...');
+                            if (isAutoMode) {
+                                updateAvatarState('listening');
+                                updateStatus('Sesinizi bekliyorum...', 'auto');
+                                await initAudio();
+                                startVoiceDetection();
+                            }
+                        }, 1000);
                     }
                 }
             } catch (error) {
@@ -1305,12 +1333,28 @@
                 console.error('Sunucu hatası:', error);
                 showError('Sunucu ile iletişim hatası: ' + error.message);
                 
-                isMediaRecorderReady = false;
-                if (isAutoMode) {
-                    await initAudio();
-                    startVoiceDetection();
+                // Hata durumunda bile dinlemeye devam et
+                if (!interviewEnded) {
+                    setTimeout(async () => {
+                        console.log('Hata sonrası ses algılama yeniden başlatılıyor...');
+                        if (isAutoMode) {
+                            updateAvatarState('listening');
+                            updateStatus('Sesinizi bekliyorum...', 'auto');
+                            await initAudio();
+                            startVoiceDetection();
+                        }
+                    }, 1000);
                 }
             }
+        }
+
+        function stopVoiceDetection() {
+            console.log('Ses algılama manuel olarak durduruluyor...');
+            if (mediaRecorder && mediaRecorder.state === 'recording') {
+                mediaRecorder.stop();
+            }
+            isRecording = false;
+            silenceStart = null;
         }
 
         function showProcessingSteps() {
