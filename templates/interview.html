@@ -553,6 +553,28 @@
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
+
+        /* Süre sayacı için stil */
+        .timer {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 0.75rem 1.5rem;
+            border-radius: 1rem;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+            font-size: 1.2rem;
+            font-weight: 600;
+            color: #4f46e5;
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .timer i {
+            color: #ef4444;
+        }
     </style>
 </head>
 <body>
@@ -633,7 +655,7 @@
         <!-- AIVA Avatar -->
         <div class="aiva-avatar" id="aivaAvatar">
             <div class="avatar-effect" id="avatarEffect"></div>
-            <i class="fas fa-robot text-white text-7xl"></i>
+            <i class="fas fa-smile-beam text-white text-7xl"></i>
         </div>
 
         <!-- Chat Messages -->
@@ -644,6 +666,12 @@
     <div class="status-indicator">
         <div class="status-dot" id="statusDot"></div>
         <span id="statusText">Dinlemeye hazır</span>
+    </div>
+
+    <!-- Süre Sayacı -->
+    <div class="timer">
+        <i class="fas fa-clock"></i>
+        <span id="interviewTimer">00:00</span>
     </div>
 
     <!-- Mod Butonu -->
@@ -682,6 +710,8 @@
         let isMediaRecorderReady = false;
         let interviewCode = new URLSearchParams(window.location.search).get('code');
         let realtimeSession = null;
+        let interviewStartTime = null;
+        let timerInterval = null;
 
         // WebSocket yerine SSE kullanımı
         async function initializeRealtimeSession() {
@@ -770,19 +800,22 @@
                             modeButton.innerHTML = '<i class="fas fa-microphone"></i> <span>Otomatik Mod</span>';
                             updateStatus('Otomatik mod aktif', 'auto');
                         } else {
+                            stopVoiceDetection();
+                            isGPTSpeaking = false; // Manuel moda geçerken GPT konuşma durumunu sıfırla
                             updateAvatarState('idle');
                             modeButton.innerHTML = '<i class="fas fa-hand"></i> <span>Manuel Mod</span>';
-                            updateStatus('Manuel mod aktif', 'manual');
+                            updateStatus('Space tuşuna basılı tutarak konuşun', 'manual');
                         }
                     } else {
                         // Mülakatı başlat
                         const modeButton = document.getElementById('modeButton');
                         modeButton.classList.add('interview-started');
-                        modeButton.innerHTML = '<i class="fas fa-microphone"></i> <span>Otomatik Mod</span>';
-                        isAutoMode = true;
-                        startVoiceDetection();
-                        updateAvatarState('listening');
-                        updateStatus('Otomatik mod aktif', 'auto');
+                        modeButton.innerHTML = '<i class="fas fa-hand"></i> <span>Manuel Mod</span>';
+                        isAutoMode = false; // Manuel modda başlat
+                        isGPTSpeaking = false; // Başlangıçta GPT konuşma durumunu sıfırla
+                        updateAvatarState('idle');
+                        updateStatus('Space tuşuna basılı tutarak konuşun', 'manual');
+                        startTimer(); // Süre sayacını başlat
                     }
                 }
             });
@@ -807,22 +840,55 @@
             });
 
             // Space tuşu kontrolü
-            document.addEventListener('keydown', (e) => {
-                if (e.code === 'Space' && !isAutoMode && !isGPTSpeaking) {
+            document.addEventListener('keydown', async (e) => {
+                if (e.code === 'Space' && !isAutoMode && !interviewEnded) {
                     e.preventDefault();
+                    if (isGPTSpeaking) {
+                        showError('Lütfen GPT konuşmasının bitmesini bekleyin');
+                        return;
+                    }
                     if (!isRecording) {
+                        if (!isMediaRecorderReady) {
+                            await initAudio();
+                        }
                         startRecording();
                         updateAvatarState('listening');
+                        updateStatus('Kaydediliyor...', 'recording');
                     }
                 }
             });
 
             document.addEventListener('keyup', (e) => {
-                if (e.code === 'Space' && !isAutoMode) {
+                if (e.code === 'Space' && !isAutoMode && !interviewEnded) {
                     e.preventDefault();
                     if (isRecording) {
                         stopRecording();
                         updateAvatarState('idle');
+                        updateStatus('Space tuşuna basılı tutarak konuşun', 'manual');
+                    }
+                }
+            });
+
+            // Tarayıcı kapandığında rapor oluştur
+            window.addEventListener('beforeunload', async (event) => {
+                if (!interviewEnded) {
+                    event.preventDefault();
+                    event.returnValue = '';
+                    
+                    try {
+                        // Rapor oluşturma isteği gönder
+                        await fetch('/generate_report', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify({
+                                interview_code: interviewCode,
+                                auto_close: true
+                            })
+                        });
+                    } catch (error) {
+                        console.error('Rapor oluşturma hatası:', error);
                     }
                 }
             });
@@ -849,10 +915,10 @@
         }
 
         // Ses seviyesi eşikleri
-        const VOICE_THRESHOLD = 0.12;    // Konuşma başlangıç eşiği (orta hassasiyet)
-        const SILENCE_THRESHOLD = 0.04;   // Sessizlik eşiği (düşük gürültü toleransı)
-        const SILENCE_DURATION = 1200;    // Sessizlik süresi (1.2 saniye)
-        const MIN_RECORDING_DURATION = 500; // Minimum kayıt süresi (0.5 saniye)
+        const SILENCE_THRESHOLD = 0.05;  // Sessizlik eşiği (app2.py'dan alındı)
+        const VOICE_THRESHOLD = 0.15;    // Konuşma başlangıç eşiği
+        const SILENCE_DURATION = 1500;   // Sessizlik süresi (ms)
+        const MIN_CONFIDENCE = 0.6;      // Minimum güven skoru
 
         async function initAudio() {
             try {
@@ -949,14 +1015,34 @@
         }
 
         function startVoiceDetection() {
-            if (!analyser || !isAutoMode || isSpeaking || isGPTSpeaking || isProcessingUtterance) return;
+            if (!analyser || !isAutoMode || interviewEnded) {
+                console.log('Ses algılama başlatılamıyor:', {
+                    analyserExists: !!analyser,
+                    isAutoMode,
+                    isGPTSpeaking,
+                    interviewEnded
+                });
+                return;
+            }
+
+            if (isGPTSpeaking) {
+                showError('Lütfen GPT konuşmasının bitmesini bekleyin');
+                return;
+            }
             
+            console.log('Ses algılama başlatılıyor...');
             const bufferLength = analyser.frequencyBinCount;
             const dataArray = new Uint8Array(bufferLength);
-            let recordingStartTime = null;
-
+            
             function checkAudioLevel() {
-                if (!isAutoMode || isSpeaking || isGPTSpeaking || isProcessingUtterance) return;
+                if (!isAutoMode || isGPTSpeaking || interviewEnded) {
+                    console.log('Ses algılama durduruluyor:', {
+                        isAutoMode,
+                        isGPTSpeaking,
+                        interviewEnded
+                    });
+                    return;
+                }
                 
                 analyser.getByteFrequencyData(dataArray);
                 const average = dataArray.reduce((a, b) => a + b) / bufferLength;
@@ -964,31 +1050,29 @@
                 
                 updateVolumeIndicator(volume);
                 
-                // Konuşma başlangıcı
-                if (!isRecording && volume > VOICE_THRESHOLD) {
-                    recordingStartTime = Date.now();
+                if (!isRecording && !isGPTSpeaking && volume > VOICE_THRESHOLD) {
+                    console.log('Ses algılandı, kayıt başlatılıyor...');
                     startRecording();
-                } 
-                // Konuşma bitişi kontrolü
-                else if (isRecording && volume < SILENCE_THRESHOLD) {
+                } else if (isRecording && volume < SILENCE_THRESHOLD) {
                     if (!silenceStart) {
                         silenceStart = Date.now();
-                    } 
-                    // Minimum kayıt süresini ve sessizlik süresini kontrol et
-                    else if (Date.now() - silenceStart > SILENCE_DURATION && 
-                            Date.now() - recordingStartTime > MIN_RECORDING_DURATION) {
+                    } else if (Date.now() - silenceStart > SILENCE_DURATION) {
+                        console.log('Sessizlik algılandı, kayıt durduruluyor...');
                         stopRecording();
                         silenceStart = null;
-                        recordingStartTime = null;
                     }
-                } 
-                // Ses devam ediyor
-                else {
+                } else {
                     silenceStart = null;
                 }
                 
-                if (isAutoMode && !isSpeaking && !isGPTSpeaking && !isProcessingUtterance) {
+                if (isAutoMode && !isGPTSpeaking && !interviewEnded) {
                     requestAnimationFrame(checkAudioLevel);
+                } else {
+                    console.log('Ses algılama döngüsü sonlandırıldı:', {
+                        isAutoMode,
+                        isGPTSpeaking,
+                        interviewEnded
+                    });
                 }
             }
             
@@ -1129,8 +1213,13 @@
 
         async function speakResponse(text) {
             if (isSpeaking || isGPTSpeaking) {
-                console.log('Zaten konuşma devam ediyor');
-                return;
+                console.log('Zaten konuşma devam ediyor, sıraya alınıyor...');
+                return new Promise((resolve) => {
+                    setTimeout(async () => {
+                        await speakResponse(text);
+                        resolve();
+                    }, 500);
+                });
             }
 
             return new Promise((resolve) => {
@@ -1138,7 +1227,7 @@
                 
                 const utterance = new SpeechSynthesisUtterance(text);
                 utterance.lang = 'tr-TR';
-                utterance.rate = 1.0;
+                utterance.rate = 1.3;
                 utterance.pitch = 1.0;
                 utterance.volume = 1.0;
                 
@@ -1154,8 +1243,6 @@
                     isGPTSpeaking = true;
                     updateStatus('GPT yanıt veriyor...', 'speaking');
                     updateAvatarState('speaking');
-                    // Konuşma başladığında mesajı ekle
-                    addMessageToChat('assistant', text);
                 };
                 
                 utterance.onend = async () => {
@@ -1171,6 +1258,8 @@
                     } else {
                         updateStatus('Space tuşuna basılı tutarak konuşun', 'manual');
                         updateAvatarState('idle');
+                        // Manuel modda ses sistemini yeniden başlat
+                        await initAudio();
                     }
                     
                     resolve();
@@ -1185,11 +1274,7 @@
                     resolve();
                 };
 
-                if (!isSpeaking && !isGPTSpeaking) {
-                    window.speechSynthesis.speak(utterance);
-                } else {
-                    resolve();
-                }
+                window.speechSynthesis.speak(utterance);
             });
         }
 
@@ -1221,7 +1306,7 @@
 
         async function sendAudioToServer(audioBlob) {
             try {
-                if (isSpeaking || isGPTSpeaking) {
+                if (isGPTSpeaking) {
                     console.log('GPT konuşuyor, ses kaydı işlenmeyecek');
                     return;
                 }
@@ -1263,8 +1348,6 @@
 
                     if (data.transcript) {
                         addMessageToChat('user', data.transcript);
-                        // Değerlendirme için bekle
-                        await new Promise(resolve => setTimeout(resolve, 1000));
                     }
 
                     // Değerlendirme tamamlandı
@@ -1272,22 +1355,24 @@
                     updateProcessingStep('respond', 'active');
 
                     if (data.response) {
-                        // Yanıt hazırlanıyor aşamasında biraz bekle
-                        await new Promise(resolve => setTimeout(resolve, 1000));
+                        // GPT konuşmaya başlamadan önce ses algılamayı durdur
+                        isGPTSpeaking = true;
+                        stopVoiceDetection();
+                        
+                        addMessageToChat('assistant', data.response);
+                        updateAvatarState('speaking');
                         
                         // Yanıt hazır
                         updateProcessingStep('respond', 'completed');
-                        
-                        // Yanıtı seslendirmeye başla
-                        isGPTSpeaking = true;
-                        updateAvatarState('speaking');
-                        
-                        // İşlem adımlarını kaldırmadan önce biraz bekle
-                        await new Promise(resolve => setTimeout(resolve, 1000));
-                        hideProcessingSteps();
+                        setTimeout(() => {
+                            hideProcessingSteps();
+                        }, 1000);
+
+                        // Sadece speakResponse fonksiyonunu kullan
+                        await speakResponse(data.response);
                     }
                     
-                    if (data.interview_completed) {
+                    if (data.interview_ended) {
                         interviewEnded = true;
                         await endInterview();
                     }
@@ -1295,9 +1380,16 @@
                     hideProcessingSteps();
                     showError(data.error || 'Ses işlenemedi');
                     
-                    if (!data.continue_listening) {
-                        isAutoMode = false;
-                        updateStatus('Manuel moda geçildi (Space tuşunu kullanın)', 'manual');
+                    // Hata durumunda bile dinlemeye devam et
+                    if (data.continue_listening && !interviewEnded) {
+                        setTimeout(async () => {
+                            console.log('Hata sonrası ses algılama yeniden başlatılıyor...');
+                            if (isAutoMode) {
+                                updateAvatarState('listening');
+                                updateStatus('Sesinizi bekliyorum...', 'auto');
+                                startVoiceDetection();
+                            }
+                        }, 1000);
                     }
                 }
             } catch (error) {
@@ -1305,12 +1397,27 @@
                 console.error('Sunucu hatası:', error);
                 showError('Sunucu ile iletişim hatası: ' + error.message);
                 
-                isMediaRecorderReady = false;
-                if (isAutoMode) {
-                    await initAudio();
-                    startVoiceDetection();
+                // Hata durumunda bile dinlemeye devam et
+                if (!interviewEnded) {
+                    setTimeout(async () => {
+                        console.log('Hata sonrası ses algılama yeniden başlatılıyor...');
+                        if (isAutoMode) {
+                            updateAvatarState('listening');
+                            updateStatus('Sesinizi bekliyorum...', 'auto');
+                            startVoiceDetection();
+                        }
+                    }, 1000);
                 }
             }
+        }
+
+        function stopVoiceDetection() {
+            console.log('Ses algılama manuel olarak durduruluyor...');
+            if (mediaRecorder && mediaRecorder.state === 'recording') {
+                mediaRecorder.stop();
+            }
+            isRecording = false;
+            silenceStart = null;
         }
 
         function showProcessingSteps() {
@@ -1520,7 +1627,11 @@
 
         async function endInterview() {
             try {
+                stopTimer(); // Süre sayacını durdur
                 await stopAudioSystem();
+                
+                // Veda mesajı göster
+                addMessageToChat('assistant', 'Mülakat tamamlandı. Sorularımız bitti. Katılımınız için teşekkür ederiz. Şimdi rapor oluşturulacak ve tarayıcı penceresi kapandığında size iletilecektir.');
                 
                 console.log('Mülakat sonlandırma isteği gönderiliyor...');
                 const response = await fetch('/stop_recording', {
@@ -1725,6 +1836,31 @@
                 console.error('Gerçek zamanlı sohbet hatası:', error);
                 showError('Bağlantı hatası: ' + error.message);
             }
+        }
+
+        // Süre sayacı fonksiyonları
+        function startTimer() {
+            interviewStartTime = new Date();
+            updateTimer();
+            timerInterval = setInterval(updateTimer, 1000);
+        }
+
+        function stopTimer() {
+            if (timerInterval) {
+                clearInterval(timerInterval);
+            }
+        }
+
+        function updateTimer() {
+            if (!interviewStartTime) return;
+            
+            const now = new Date();
+            const diff = now - interviewStartTime;
+            const minutes = Math.floor(diff / 60000);
+            const seconds = Math.floor((diff % 60000) / 1000);
+            
+            document.getElementById('interviewTimer').textContent = 
+                `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
         }
 
     </script>
