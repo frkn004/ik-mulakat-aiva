@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AIVA - Giriş Yap</title>
+    <link href="https://unpkg.com/tailwindcss@^2/dist/tailwind.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+            min-height: 100vh;
+        }
+        .glassmorphism {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        }
+        .aiva-logo {
+            width: 180px;
+            transition: transform 0.3s ease;
+        }
+        .aiva-logo:hover {
+            transform: scale(1.05);
+        }
+        .yellow-gradient-btn {
+            background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
+        }
+        .yellow-gradient-btn:hover {
+            background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+        }
+        .input-field {
+            transition: all 0.3s ease;
+            border: 2px solid #fde68a;
+        }
+        .input-field:focus {
+            border-color: #f59e0b;
+            box-shadow: 0 0 0 3px rgba(251, 191, 36, 0.2);
+        }
+    </style>
+</head>
+<body class="p-6">
+    <div class="max-w-md mx-auto">
+        <!-- Header with AIVA Logo -->
+        <div class="glassmorphism rounded-2xl p-6 mb-8">
+            <div class="text-center">
+                <img src="https://www.aivatech.io/wp-content/uploads/2023/09/AIVA-App-Logo1-1200-x-300piksel-1-1-1024x256.png" 
+                     alt="AIVA Logo" 
+                     class="aiva-logo mx-auto mb-4">
+                <h1 class="text-3xl font-bold text-gray-800">Giriş Yap</h1>
+                <p class="text-gray-600 mt-1">Mülakat oluşturmak için giriş yapın</p>
+            </div>
+        </div>
+
+        <!-- Giriş Formu -->
+        <div class="glassmorphism rounded-2xl p-8">
+            {% if error %}
+            <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg mb-6">
+                {{ error }}
+            </div>
+            {% endif %}
+
+            <form method="POST" action="{{ url_for('login') }}" class="space-y-6">
+                <div>
+                    <label for="username" class="block text-sm font-medium text-gray-700 mb-2">
+                        Kullanıcı Adı
+                    </label>
+                    <input type="text" 
+                           id="username" 
+                           name="username"
+                           required
+                           class="w-full px-4 py-3 rounded-xl input-field text-gray-700"
+                           placeholder="admin">
+                </div>
+
+                <div>
+                    <label for="password" class="block text-sm font-medium text-gray-700 mb-2">
+                        Şifre
+                    </label>
+                    <div class="relative">
+                        <input type="password" 
+                               id="password" 
+                               name="password"
+                               required
+                               class="w-full px-4 py-3 rounded-xl input-field text-gray-700"
+                               placeholder="••••••••">
+                    </div>
+                </div>
+
+                <button type="submit" 
+                        class="w-full yellow-gradient-btn text-white 
+                               font-medium text-lg py-4 px-6 rounded-xl shadow-lg 
+                               hover:shadow-xl transition-all duration-300 
+                               flex items-center justify-center space-x-3">
+                    <i class="fas fa-sign-in-alt text-xl"></i>
+                    <span>Giriş Yap</span>
+                </button>
+            </form>
+        </div>
+    </div>
+</body>
+</html> 

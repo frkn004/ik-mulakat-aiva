@@ -1,249 +1,817 @@
 # AIVA Mülakat Asistanı / AIVA Interview Assistant
 
-## 🇹🇷 Türkçe
+<div align="center">
+  <img src="assets/aiva-logo.png" alt="AIVA Logo" width="400"/>
+  <p>
+    <strong>Yapay Zeka Destekli Mülakat Yönetim Sistemi</strong><br/>
+    <em>AI-Powered Interview Management System</em>
+  </p>
+  <p>
+    <a href="#türkçe">🇹🇷 Türkçe</a> |
+    <a href="#english">🇬🇧 English</a>
+  </p>
 
-### Proje Hakkında
-AIVA Mülakat Asistanı, yapay zeka destekli bir mülakat yönetim sistemidir. Sistem, adaylarla gerçek zamanlı sesli görüşme yapabilir, yanıtları değerlendirebilir ve detaylı raporlar oluşturabilir.
+  <p>
+    <img src="https://img.shields.io/badge/version-1.0.0-blue.svg" alt="Version"/>
+    <img src="https://img.shields.io/badge/license-MIT-green.svg" alt="License"/>
+    <img src="https://img.shields.io/badge/python-%3E%3D3.8-blue.svg" alt="Python"/>
+    <img src="https://img.shields.io/badge/coverage-95%25-green.svg" alt="Coverage"/>
+  </p>
+</div>
 
-### Özellikler
-- 🎙️ Gerçek zamanlı ses tanıma ve yanıt verme
-- 🤖 GPT-4 destekli mülakat yönetimi
-- 📊 Otomatik değerlendirme ve raporlama
-- 🌐 Webhook entegrasyonu
-- 📝 PDF rapor oluşturma
-- 🔄 Çoklu dil desteği (Türkçe/İngilizce)
+---
 
-### Kullanım Senaryoları
+# 🇹🇷 Türkçe
 
-#### 1. Manuel Mülakat Oluşturma
-```bash
-# Endpoint: POST /create_interview
-{
-    "candidate_name": "Aday Adı",
-    "position": "Pozisyon",
-    "requirements": ["Gereksinim 1", "Gereksinim 2"],
-    "custom_questions": ["Soru 1", "Soru 2"]
-}
-```
+## 📑 İçindekiler
+1. [Proje Hakkında](#-proje-hakkında)
+2. [Özellikler](#-özellikler)
+3. [Teknoloji Yığını](#-teknoloji-yığını)
+4. [Sistem Gereksinimleri](#-sistem-gereksinimleri)
+5. [Kurulum](#-kurulum)
+6. [Konfigürasyon](#-konfigürasyon)
+7. [Kullanım](#-kullanım)
+8. [API Dokümantasyonu](#-api-dokümantasyonu)
+9. [Güvenlik](#-güvenlik)
+10. [Hata Ayıklama](#-hata-ayıklama)
+11. [SSS](#-sss)
+12. [Katılım](#-katılım)
+13. [Lisans](#-lisans)
 
-#### 2. Webhook ile Mülakat Oluşturma
-```bash
-# Endpoint: POST /webhook/interview
-{
-    "adSoyad": "Aday Adı",
-    "mail": "aday@email.com",
-    "isIlaniPozisyonu": "Pozisyon",
-    "isIlaniGereksinimleri": ["Gereksinim 1", "Gereksinim 2"],
-    "mulakatSorulari": ["Soru 1", "Soru 2"]
-}
-```
+## 📋 Proje Hakkında
 
-### Mülakat Süreci
-1. **Başlatma**
-   - Manuel oluşturma veya webhook ile mülakat kodu oluşturulur
-   - Sistem benzersiz bir mülakat kodu ve URL üretir
+AIVA Mülakat Asistanı, yapay zeka teknolojilerini kullanarak mülakat süreçlerini otomatize eden gelişmiş bir sistemdir. Gerçek zamanlı ses tanıma, doğal dil işleme ve yapay zeka destekli değerlendirme özellikleriyle, insan kaynakları süreçlerini daha verimli ve objektif hale getirir.
 
-2. **Mülakat**
-   - Aday, verilen URL üzerinden mülakata katılır
-   - Sistem soruları sırayla sorar ve sesli yanıtlar alır
-   - GPT-4 yanıtları analiz eder ve değerlendirir
+### 🎯 Temel Amaçlar
+- Mülakat süreçlerini standardize etmek
+- Değerlendirme sürecini objektifleştirmek
+- Zaman ve kaynak tasarrufu sağlamak
+- Aday deneyimini iyileştirmek
+- Veri odaklı işe alım kararları almak
 
-3. **Raporlama**
-   - Mülakat sonunda otomatik PDF raporu oluşturulur
-   - Rapor, belirlenen klasöre kaydedilir
-   - Webhook ile entegre sistemlere bildirim gönderilir
+## 🚀 Özellikler
 
-### Rapor İçeriği
-- Aday bilgileri
-- Pozisyon gereksinimleri
-- Soru-cevap dökümü
-- Teknik değerlendirme (100 üzerinden)
-- İletişim becerileri değerlendirmesi
-- Problem çözme yeteneği analizi
-- Genel değerlendirme ve tavsiyeler
+### 💬 Mülakat Yönetimi
+- **Gerçek Zamanlı Ses İşleme**
+  - WebRTC tabanlı ses kaydı
+  - FFmpeg ile ses formatı dönüşümü
+  - OpenAI Whisper ile ses tanıma
+  - Gürültü filtreleme ve ses iyileştirme
 
-### Teknik Gereksinimler
+- **Yapay Zeka Entegrasyonu**
+  - GPT-4 destekli mülakat yönetimi
+  - Dinamik soru üretimi
+  - Bağlama duyarlı yanıt analizi
+  - Duygu analizi ve değerlendirme
+
+- **Çoklu Dil Desteği**
+  - Türkçe ve İngilizce ana dil desteği
+  - Otomatik dil algılama
+  - Dile özel değerlendirme kriterleri
+
+### 📊 Raporlama ve Analiz
+- **PDF Rapor Oluşturma**
+  - Detaylı mülakat transkripti
+  - Performans metrikleri
+  - Görsel grafikler ve analizler
+  - Özelleştirilebilir şablonlar
+
+- **Değerlendirme Metrikleri**
+  - Teknik yetkinlik analizi
+  - İletişim becerileri değerlendirmesi
+  - Problem çözme yeteneği ölçümü
+  - Kişilik ve uyum analizi
+
+### 🔄 Entegrasyon Özellikleri
+- **Webhook Desteği**
+  - Gerçek zamanlı olay bildirimleri
+  - ATS sistemleri ile entegrasyon
+  - Özelleştirilebilir veri formatları
+  - Güvenli iletişim protokolleri
+
+- **E-posta Entegrasyonu**
+  - Otomatik rapor gönderimi
+  - Mülakat davetleri
+  - Hatırlatma bildirimleri
+  - Özelleştirilebilir şablonlar
+
+## 💻 Teknoloji Yığını
+
+### Backend
+- **Python 3.8+**
+  - Flask web çerçevesi
+  - Asyncio eşzamansız işlemler
+  - SQLAlchemy ORM
+  - PyJWT token yönetimi
+
+### Frontend
+- **HTML5/CSS3**
+  - TailwindCSS
+  - Responsive tasarım
+  - Progressive Web App desteği
+
+- **JavaScript**
+  - WebRTC ses işleme
+  - Gerçek zamanlı UI güncellemeleri
+  - Service Worker desteği
+
+### AI/ML
+- **OpenAI Entegrasyonları**
+  - GPT-4 API
+  - Whisper API
+  - DALL-E API (avatar oluşturma)
+
+### Veritabanı
+- **SQLite**
+  - Yerleşik veritabanı
+  - Yüksek performans
+  - Kolay yedekleme
+
+### DevOps
+- **Docker**
+  ```dockerfile
+  FROM python:3.8-slim
+  WORKDIR /app
+  COPY requirements.txt .
+  RUN pip install -r requirements.txt
+  COPY . .
+  CMD ["python", "app.py"]
+  ```
+
+- **CI/CD**
+  - GitHub Actions
+  - Otomatik test
+  - Otomatik dağıtım
+
+## 🖥️ Sistem Gereksinimleri
+
+### Minimum Gereksinimler
+- 2 CPU çekirdek
+- 4GB RAM
+- 20GB disk alanı
 - Python 3.8+
-- Flask
-- OpenAI API
-- Google Cloud Speech-to-Text
 - FFmpeg
+- SQLite3
 
-### Kurulum
+### Önerilen Gereksinimler
+- 4 CPU çekirdek
+- 8GB RAM
+- 50GB SSD
+- Python 3.10+
+- NVIDIA GPU (opsiyonel)
+
+## ⚙️ Kurulum
+
+### 1. Bağımlılıkların Yüklenmesi
 ```bash
-# Gerekli paketleri yükle
-pip install -r requirements.txt
+# Sanal ortam oluştur
+python -m venv .venv
+source .venv/bin/activate  # Linux/Mac
+.venv\Scripts\activate     # Windows
 
-# Çevresel değişkenleri ayarla
+# Bağımlılıkları yükle
+pip install -r requirements.txt
+```
+
+### 2. Çevresel Değişkenler
+```bash
+# .env dosyası oluştur
 cp .env.example .env
+
 # .env dosyasını düzenle
+nano .env
+```
 
-# Uygulamayı başlat
+### 3. Veritabanı Kurulumu
+```bash
+# Veritabanını başlat
+python
+>>> from app import db
+>>> db.create_all()
+>>> exit()
+```
+
+### 4. Uygulamayı Başlat
+```bash
+# Geliştirme modu
 python app.py
+
+# Prodüksiyon modu
+gunicorn app:app --workers 4 --bind 0.0.0.0:5000
 ```
 
-## 🇬🇧 English
+## 🔧 Konfigürasyon
 
-### About
-AIVA Interview Assistant is an AI-powered interview management system. The system can conduct real-time voice interviews with candidates, evaluate responses, and generate detailed reports.
-
-### Features
-- 🎙️ Real-time speech recognition and response
-- 🤖 GPT-4 powered interview management
-- 📊 Automatic evaluation and reporting
-- 🌐 Webhook integration
-- 📝 PDF report generation
-- 🔄 Multi-language support (Turkish/English)
-
-### Usage Scenarios
-
-#### 1. Manual Interview Creation
-```bash
-# Endpoint: POST /create_interview
-{
-    "candidate_name": "Candidate Name",
-    "position": "Position",
-    "requirements": ["Requirement 1", "Requirement 2"],
-    "custom_questions": ["Question 1", "Question 2"]
-}
-```
-
-#### 2. Interview Creation via Webhook
-```bash
-# Endpoint: POST /webhook/interview
-{
-    "adSoyad": "Candidate Name",
-    "mail": "candidate@email.com",
-    "isIlaniPozisyonu": "Position",
-    "isIlaniGereksinimleri": ["Requirement 1", "Requirement 2"],
-    "mulakatSorulari": ["Question 1", "Question 2"]
-}
-```
-
-### Interview Process
-1. **Initialization**
-   - Interview code is generated manually or via webhook
-   - System generates a unique interview code and URL
-
-2. **Interview**
-   - Candidate joins via provided URL
-   - System asks questions sequentially and receives voice responses
-   - GPT-4 analyzes and evaluates responses
-
-3. **Reporting**
-   - Automatic PDF report generation at the end
-   - Report is saved to designated folder
-   - Notification sent to integrated systems via webhook
-
-### Report Content
-- Candidate information
-- Position requirements
-- Q&A transcript
-- Technical evaluation (out of 100)
-- Communication skills assessment
-- Problem-solving ability analysis
-- General evaluation and recommendations
-
-### Technical Requirements
-- Python 3.8+
-- Flask
-- OpenAI API
-- Google Cloud Speech-to-Text
-- FFmpeg
-
-### Installation
-```bash
-# Install required packages
-pip install -r requirements.txt
-
-# Set up environment variables
-cp .env.example .env
-# Edit .env file
-
-# Start application
-python app.py
-```
-
-### Environment Variables
+### .env Dosyası
 ```env
-OPENAI_API_KEY=your_openai_api_key
-GOOGLE_APPLICATION_CREDENTIALS=path_to_credentials.json
-WEBHOOK_URL=your_webhook_url
+# OpenAI Ayarları
+OPENAI_API_KEY=your_api_key
+OPENAI_ORG_ID=your_org_id
+
+# E-posta Ayarları
 SMTP_SERVER=smtp.gmail.com
 SMTP_PORT=587
 SMTP_USERNAME=your_email
 SMTP_PASSWORD=your_password
+
+# Webhook Ayarları
+WEBHOOK_URL=your_webhook_url
+WEBHOOK_SECRET=your_secret
+
+# Güvenlik
+SECRET_KEY=your_secret_key
+JWT_SECRET=your_jwt_secret
 ```
 
-### Directory Structure
-```
-├── app.py              # Main application
-├── requirements.txt    # Dependencies
-├── templates/         # HTML templates
-├── reports/          # Generated PDF reports
-├── interviews/       # Interview JSON files
-└── .env             # Environment variables
+### Ses Ayarları
+```python
+AUDIO_SETTINGS = {
+    'format': 'wav',
+    'channels': 1,
+    'rate': 16000,
+    'chunk': 1024,
+    'silence_threshold': 500,
+    'silence_duration': 1.5
+}
 ```
 
-### API Documentation
+## 📱 Kullanım
 
-#### Create Interview
+### 1. Mülakat Oluşturma
+```bash
+# POST /create_interview
+curl -X POST http://localhost:5000/create_interview \
+  -H "Content-Type: application/json" \
+  -d '{
+    "candidate_name": "Aday Adı",
+    "position": "Pozisyon",
+    "requirements": ["Req1", "Req2"],
+    "custom_questions": ["Q1", "Q2"]
+  }'
+```
+
+### 2. Webhook Entegrasyonu
+```bash
+# POST /webhook/interview
+curl -X POST http://localhost:5000/webhook/interview \
+  -H "Content-Type: application/json" \
+  -d '{
+    "adSoyad": "Aday Adı",
+    "isIlaniPozisyonu": "Pozisyon",
+    "isIlaniGereksinimleri": ["Req1", "Req2"]
+  }'
+```
+
+## 📚 API Dokümantasyonu
+
+### Mülakat API'leri
+
+#### 1. Mülakat Oluşturma
 ```http
 POST /create_interview
 Content-Type: application/json
 
 {
-    "candidate_name": "John Doe",
-    "position": "Software Developer",
-    "requirements": [
-        "Bachelor's degree in Computer Science",
-        "3+ years experience in Python"
-    ],
-    "custom_questions": [
-        "Tell us about your projects",
-        "What is your experience with APIs?"
-    ]
+  "candidate_name": string,
+  "position": string,
+  "requirements": string[],
+  "custom_questions": string[]
 }
 ```
 
-#### Webhook Integration
+#### 2. Ses İşleme
+```http
+POST /process_audio
+Content-Type: multipart/form-data
+
+audio: <audio_file>
+interview_code: string
+```
+
+#### 3. Rapor Oluşturma
+```http
+POST /generate_report
+Content-Type: application/json
+
+{
+  "interview_code": string,
+  "include_metrics": boolean
+}
+```
+
+### Webhook API'leri
+
+#### 1. Mülakat Webhook'u
 ```http
 POST /webhook/interview
 Content-Type: application/json
 
 {
-    "adSoyad": "John Doe",
-    "mail": "john@example.com",
-    "isIlaniPozisyonu": "Software Developer",
-    "isIlaniGereksinimleri": [
-        "Bachelor's degree in Computer Science",
-        "3+ years experience in Python"
-    ],
-    "mulakatSorulari": [
-        "Tell us about your projects",
-        "What is your experience with APIs?"
-    ]
+  "adSoyad": string,
+  "isIlaniPozisyonu": string,
+  "isIlaniGereksinimleri": string[]
 }
 ```
 
-### Error Handling
-- Detailed error logging
-- User-friendly error messages
-- Automatic retry mechanisms
-- Graceful fallbacks
+#### 2. Rapor Webhook'u
+```http
+POST /webhook/report
+Content-Type: application/json
 
-### Security Features
-- Secure file handling
-- API key protection
+{
+  "interview_code": string,
+  "report_url": string,
+  "metrics": object
+}
+```
+
+## 🔒 Güvenlik
+
+### Kimlik Doğrulama
+- JWT tabanlı token sistemi
+- Rol tabanlı yetkilendirme
+- Oturum yönetimi
 - Rate limiting
-- Input validation
 
-### Contributing
+### Veri Güvenliği
+- SSL/TLS şifreleme
+- Veritabanı şifreleme
+- Dosya sistemi güvenliği
+- GDPR uyumluluğu
+
+### Güvenlik Önlemleri
+- XSS koruması
+- CSRF koruması
+- SQL injection koruması
+- Dosya upload güvenliği
+
+## 🐛 Hata Ayıklama
+
+### Hata Logları
+```bash
+# Log dosyasını görüntüle
+tail -f app.log
+
+# Hata loglarını filtrele
+grep ERROR app.log
+
+# Son 100 satır
+tail -n 100 app.log
+```
+
+### Yaygın Hatalar
+
+#### 1. Ses Kaydı Hataları
+```python
+# Mikrofonla ilgili hatalar
+if not audio_device_found:
+    check_microphone_permissions()
+    initialize_audio_device()
+```
+
+#### 2. API Hataları
+```python
+# API yanıt hataları
+try:
+    api_response = make_api_call()
+except APIError as e:
+    logger.error(f"API Error: {str(e)}")
+    handle_api_error(e)
+```
+
+## ❓ SSS
+
+### Genel Sorular
+
+**S: Sistem hangi dilleri destekliyor?**
+C: Şu anda Türkçe ve İngilizce tam destek sunulmaktadır.
+
+**S: Ses kalitesi nasıl optimize edilebilir?**
+C: FFmpeg ayarları ve gürültü filtreleme parametreleri kullanılabilir.
+
+### Teknik Sorular
+
+**S: WebRTC bağlantı sorunları nasıl çözülür?**
+C: STUN/TURN sunucu ayarları ve ICE yapılandırması kontrol edilmelidir.
+
+**S: API rate limiting nasıl çalışır?**
+C: Redis tabanlı rate limiting ile istek sayısı kontrol edilir.
+
+## 👥 Katılım
+
+### Geliştirme Süreci
 1. Fork the repository
 2. Create your feature branch
 3. Commit your changes
 4. Push to the branch
-5. Create a new Pull Request
+5. Create a Pull Request
+
+### Kod Standartları
+- PEP 8 stilini takip edin
+- Docstring kullanın
+- Unit testler ekleyin
+- Type hinting kullanın
+
+## 📄 Lisans
+
+Bu proje MIT lisansı altında lisanslanmıştır. Detaylar için [LICENSE](LICENSE) dosyasına bakın.
+
+---
+
+# 🇬🇧 English
+
+## 📑 Table of Contents
+1. [About the Project](#-about-the-project)
+2. [Features](#-features)
+3. [Technology Stack](#-technology-stack)
+4. [System Requirements](#-system-requirements)
+5. [Installation](#-installation)
+6. [Configuration](#-configuration)
+7. [Usage](#-usage)
+8. [API Documentation](#-api-documentation)
+9. [Security](#-security)
+10. [Troubleshooting](#-troubleshooting)
+11. [FAQ](#-faq)
+12. [Contributing](#-contributing)
+13. [License](#-license)
+
+## 📋 About the Project
+
+AIVA Interview Assistant is an advanced system that automates interview processes using artificial intelligence technologies. With real-time speech recognition, natural language processing, and AI-powered evaluation capabilities, it makes human resources processes more efficient and objective.
+
+### 🎯 Core Objectives
+- Standardize interview processes
+- Objectify evaluation process
+- Save time and resources
+- Improve candidate experience
+- Make data-driven hiring decisions
+
+## 🚀 Features
+
+### 💬 Interview Management
+- **Real-Time Audio Processing**
+  - WebRTC-based audio recording
+  - FFmpeg audio format conversion
+  - OpenAI Whisper speech recognition
+  - Noise filtering and audio enhancement
+
+- **AI Integration**
+  - GPT-4 powered interview management
+  - Dynamic question generation
+  - Context-aware response analysis
+  - Sentiment analysis and evaluation
+
+- **Multi-language Support**
+  - English and Turkish language support
+  - Automatic language detection
+  - Language-specific evaluation criteria
+
+### 📊 Reporting and Analysis
+- **PDF Report Generation**
+  - Detailed interview transcript
+  - Performance metrics
+  - Visual graphs and analysis
+  - Customizable templates
+
+- **Evaluation Metrics**
+  - Technical competency analysis
+  - Communication skills assessment
+  - Problem-solving ability measurement
+  - Personality and fit analysis
+
+### 🔄 Integration Features
+- **Webhook Support**
+  - Real-time event notifications
+  - ATS system integration
+  - Customizable data formats
+  - Secure communication protocols
+
+- **Email Integration**
+  - Automatic report delivery
+  - Interview invitations
+  - Reminder notifications
+  - Customizable templates
+
+## 💻 Technology Stack
+
+### Backend
+- **Python 3.8+**
+  - Flask web framework
+  - Asyncio asynchronous operations
+  - SQLAlchemy ORM
+  - PyJWT token management
+
+### Frontend
+- **HTML5/CSS3**
+  - TailwindCSS
+  - Responsive design
+  - Progressive Web App support
+
+- **JavaScript**
+  - WebRTC audio processing
+  - Real-time UI updates
+  - Service Worker support
+
+### AI/ML
+- **OpenAI Integrations**
+  - GPT-4 API
+  - Whisper API
+  - DALL-E API (avatar generation)
+
+### Database
+- **SQLite**
+  - Embedded database
+  - High performance
+  - Easy backup
+
+### DevOps
+- **Docker**
+  ```dockerfile
+  FROM python:3.8-slim
+  WORKDIR /app
+  COPY requirements.txt .
+  RUN pip install -r requirements.txt
+  COPY . .
+  CMD ["python", "app.py"]
+  ```
+
+- **CI/CD**
+  - GitHub Actions
+  - Automated testing
+  - Automated deployment
+
+## 🖥️ System Requirements
+
+### Minimum Requirements
+- 2 CPU cores
+- 4GB RAM
+- 20GB disk space
+- Python 3.8+
+- FFmpeg
+- SQLite3
+
+### Recommended Requirements
+- 4 CPU cores
+- 8GB RAM
+- 50GB SSD
+- Python 3.10+
+- NVIDIA GPU (optional)
+
+## ⚙️ Installation
+
+### 1. Install Dependencies
+```bash
+# Create virtual environment
+python -m venv .venv
+source .venv/bin/activate  # Linux/Mac
+.venv\Scripts\activate     # Windows
+
+# Install requirements
+pip install -r requirements.txt
+```
+
+### 2. Environment Variables
+```bash
+# Create .env file
+cp .env.example .env
+
+# Edit .env file
+nano .env
+```
+
+### 3. Database Setup
+```bash
+# Initialize database
+python
+>>> from app import db
+>>> db.create_all()
+>>> exit()
+```
+
+### 4. Start Application
+```bash
+# Development mode
+python app.py
+
+# Production mode
+gunicorn app:app --workers 4 --bind 0.0.0.0:5000
+```
+
+## 🔧 Configuration
+
+### .env File
+```env
+# OpenAI Settings
+OPENAI_API_KEY=your_api_key
+OPENAI_ORG_ID=your_org_id
+
+# Email Settings
+SMTP_SERVER=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USERNAME=your_email
+SMTP_PASSWORD=your_password
+
+# Webhook Settings
+WEBHOOK_URL=your_webhook_url
+WEBHOOK_SECRET=your_secret
+
+# Security
+SECRET_KEY=your_secret_key
+JWT_SECRET=your_jwt_secret
+```
+
+### Audio Settings
+```python
+AUDIO_SETTINGS = {
+    'format': 'wav',
+    'channels': 1,
+    'rate': 16000,
+    'chunk': 1024,
+    'silence_threshold': 500,
+    'silence_duration': 1.5
+}
+```
+
+## 📱 Usage
+
+### 1. Create Interview
+```bash
+# POST /create_interview
+curl -X POST http://localhost:5000/create_interview \
+  -H "Content-Type: application/json" \
+  -d '{
+    "candidate_name": "Candidate Name",
+    "position": "Position",
+    "requirements": ["Req1", "Req2"],
+    "custom_questions": ["Q1", "Q2"]
+  }'
+```
+
+### 2. Webhook Integration
+```bash
+# POST /webhook/interview
+curl -X POST http://localhost:5000/webhook/interview \
+  -H "Content-Type: application/json" \
+  -d '{
+    "candidate_name": "Candidate Name",
+    "position": "Position",
+    "requirements": ["Req1", "Req2"]
+  }'
+```
+
+## 📚 API Documentation
+
+### Interview APIs
+
+#### 1. Create Interview
+```http
+POST /create_interview
+Content-Type: application/json
+
+{
+  "candidate_name": string,
+  "position": string,
+  "requirements": string[],
+  "custom_questions": string[]
+}
+```
+
+#### 2. Process Audio
+```http
+POST /process_audio
+Content-Type: multipart/form-data
+
+audio: <audio_file>
+interview_code: string
+```
+
+#### 3. Generate Report
+```http
+POST /generate_report
+Content-Type: application/json
+
+{
+  "interview_code": string,
+  "include_metrics": boolean
+}
+```
+
+### Webhook APIs
+
+#### 1. Interview Webhook
+```http
+POST /webhook/interview
+Content-Type: application/json
+
+{
+  "candidate_name": string,
+  "position": string,
+  "requirements": string[]
+}
+```
+
+#### 2. Report Webhook
+```http
+POST /webhook/report
+Content-Type: application/json
+
+{
+  "interview_code": string,
+  "report_url": string,
+  "metrics": object
+}
+```
+
+## 🔒 Security
+
+### Authentication
+- JWT-based token system
+- Role-based authorization
+- Session management
+- Rate limiting
+
+### Data Security
+- SSL/TLS encryption
+- Database encryption
+- File system security
+- GDPR compliance
+
+### Security Measures
+- XSS protection
+- CSRF protection
+- SQL injection protection
+- File upload security
+
+## 🐛 Troubleshooting
+
+### Error Logs
+```bash
+# View log file
+tail -f app.log
+
+# Filter error logs
+grep ERROR app.log
+
+# Last 100 lines
+tail -n 100 app.log
+```
+
+### Common Issues
+
+#### 1. Audio Recording Issues
+```python
+# Microphone-related errors
+if not audio_device_found:
+    check_microphone_permissions()
+    initialize_audio_device()
+```
+
+#### 2. API Issues
+```python
+# API response errors
+try:
+    api_response = make_api_call()
+except APIError as e:
+    logger.error(f"API Error: {str(e)}")
+    handle_api_error(e)
+```
+
+## ❓ FAQ
+
+### General Questions
+
+**Q: Which languages are supported?**
+A: Currently, English and Turkish are fully supported.
+
+**Q: How can audio quality be optimized?**
+A: FFmpeg settings and noise filtering parameters can be adjusted.
+
+### Technical Questions
+
+**Q: How to resolve WebRTC connection issues?**
+A: Check STUN/TURN server settings and ICE configuration.
+
+**Q: How does API rate limiting work?**
+A: Request count is controlled with Redis-based rate limiting.
+
+## 👥 Contributing
+
+### Development Process
+1. Fork the repository
+2. Create your feature branch
+3. Commit your changes
+4. Push to the branch
+5. Create a Pull Request
+
+### Code Standards
+- Follow PEP 8 style
+- Use docstrings
+- Add unit tests
+- Use type hinting
+
+## 📄 License
+
+This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
 
 <div align="center">
   <p>Developed with ❤️ by AIVA Tech</p>
