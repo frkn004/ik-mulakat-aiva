@@ -1,0 +1,15 @@
+{
+  "code": "7FC0BC43",
+  "candidate_name": "furkan sevinç",
+  "position": "yazılım muhendisi",
+  "questions": [
+    "1. En iyi bildiğiniz programlama dili nedir ve bu dildeki yetkinliğinizi nasıl açıklarsınız? Bu dildeki en karmaşık proje neydi?",
+    "2. Sıkça kullanılan bir veri yapısını (örneğin, bir dizi veya bağlı listeyi) ve bu veri yapısının nerede ve nasıl kullanıldığını açıklayabilir misiniz?",
+    "3. Hata ayıklama (debugging) için hangi teknikleri veya araçları kullanmayı tercih edersiniz? Bu yöntemlerin etkinliğini bir örnekle açıklayabilir misiniz?",
+    "4. Hangi yazılım geliştirme yöntemleri/teknikleriyle deneyiminiz var (örneğin, Agile, Scrum, Lean vb.) ve bunları efektif bir şekilde nasıl kullandığınızı bir proje üzerinden anlatabilir misiniz?",
+    "5. Bir yazılım projesi üzerinde çalışırken karşılaştığınız en büyük problem neydi ve bu problemi nasıl çözdünüz? Bu deneyimden neler öğrendiniz?"
+  ],
+  "status": "in_progress",
+  "created_at": "2025-02-03T20:44:29.450100",
+  "updated_at": "2025-02-05T15:24:34.875970"
+}

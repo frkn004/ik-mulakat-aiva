@@ -1,0 +1,26 @@
+{
+  "code": "C0C8770C",
+  "candidate_name": "nisa duru",
+  "position": "yapay zeka muhendisi",
+  "questions": [
+    "1. Yapay zekada kullanılan temel algoritmalar hakkında bilgi verebilir misiniz? Özellikle hangi algoritmalar üzerinde daha fazla deneyiminiz var?",
+    "2. Yapay zekayı kullanarak ne tür projelerde çalıştınız? Bu projelerdeki rolünüz ve kullandığınız araçlar nelerdi?",
+    "3. Derin öğrenme ve makine öğrenmesi arasındaki temel farklar nelerdir? Hangi durumlarda hangisini tercih edersiniz?",
+    "4. Önemsiz veri özelliklerini nasıl belirliyorsunuz ve bu özelliklerle nasıl başa çıkıyorsunuz?",
+    "5. Yanıtlama sürecinde aktarma öğrenmesi kavramını kullanmanız gerektiği bir durumda ne yapardınız? Bununla daha önce nasıl bir tecrübeniz oldu?"
+  ],
+  "status": "in_progress",
+  "created_at": "2025-02-03T20:16:41.764550",
+  "updated_at": "2025-02-03T20:24:13.041031",
+  "conversation_history": [
+    {
+      "role": "user",
+      "content": "Merhaba nasılsın, iyi misin?"
+    },
+    {
+      "role": "assistant",
+      "content": "Merhaba Nisa Hanım, ben de iyiyim, teşekkür ederim. Bugün sizinle tanışmak çok güzel. Müsait olduğunuzda mülakata başlayabiliriz. İlk sorum şu olacak: Yapay zekada kullanılan temel algoritmalar hakkında bilgi verebilir misiniz? Özellikle hangi algoritmalar üzerinde daha fazla deneyiminiz var?"
+    }
+  ],
+  "current_question_index": 1
+}

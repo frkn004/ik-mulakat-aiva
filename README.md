@@ -1,7 +1,7 @@
 # AIVA Mülakat Asistanı / AIVA Interview Assistant
 
 <div align="center">
-  <img src="https://www.aivatech.io/wp-content/uploads/2023/09/AIVA-App-Logo1-1200-x-300piksel-1-1-1024x256.png" alt="AIVA Logo" width="400"/>
+  <img src="assets/aiva-logo.png" alt="AIVA Logo" width="400"/>
   <p>
     <strong>Yapay Zeka Destekli Mülakat Yönetim Sistemi</strong><br/>
     <em>AI-Powered Interview Management System</em>

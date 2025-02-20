@@ -1,0 +1,19 @@
+{
+  "adSoyad": "Ali Vural",
+  "mail": "ali.vural@example.com",
+  "isIlaniPozisyonu": "Yazılım Geliştirici",
+  "isIlaniGereksinimleri": [
+    "Bilgisayar Mühendisliği veya ilgili bir alanda lisans derecesi",
+    "En az 3 yıl yazılım geliştirme deneyimi",
+    "JavaScript, React ve Node.js konularında bilgi sahibi olmak",
+    "RESTful APIler ve veritabanı yönetimi konularında deneyim",
+    "Takım çalışmasına yatkın, problem çözme becerisi yüksek"
+  ],
+  "mulakatSorulari": [
+    "Kendi projelerinizden bahsedebilir misiniz?",
+    "JavaScriptte closure nedir ve nasıl çalışır?",
+    "Bir RESTful API tasarlarken dikkat etmeniz gereken en önemli noktalar nelerdir?",
+    "Takım içinde yaşadığınız en büyük teknik problemi anlatır mısınız ve nasıl çözdünüz?",
+    "Bir yazılım geliştirme sürecinde testlerin önemi nedir?"
+  ]
+}
