@@ -284,10 +284,6 @@ class InterviewAssistant(VoiceAssistant):
         self.start_time = datetime.now()
         self.current_question_index = 0
         self.interview_questions = []
-        self.last_question_time = None
-        self.max_off_topic_count = 3  # Maksimum konu dışına çıkma sayısı
-        self.off_topic_count = 0      # Konu dışına çıkma sayacı
-        self.question_answered = False # Mevcut soru yanıtlandı mı
 
     def set_interview_details(self, code):
         """Mülakat detaylarını JSON dosyasından ayarla"""
@@ -359,77 +355,90 @@ class InterviewAssistant(VoiceAssistant):
             })
 
     async def get_gpt_response(self, text):
-        """GPT'den yanıt al ve soru takibini yap"""
+        """Mülakat bağlamında GPT yanıtını al"""
         try:
-            # Konuşma geçmişini hazırla
-            messages = [
-                {"role": "system", "content": f"""Sen bir mülakat asistanısın. 
-                Aday: {self.candidate_name}
-                Pozisyon: {self.position}
-                
-                ÖNEMLİ KURALLAR:
-                1. Sadece mülakat sorularını sor ve yanıtları değerlendir
-                2. Her seferinde sadece bir soru sor
-                3. Aday konuyu dağıtırsa nazikçe soruya geri döndür
-                4. Mevcut soruya tatmin edici yanıt alınmadan diğer soruya geçme
-                5. Yanıtlar yetersizse aynı konuda detaylandırıcı sorular sor
-                
-                Mevcut Soru: {self.interview_questions[self.current_question_index] if self.current_question_index < len(self.interview_questions) else 'Mülakat tamamlandı'}"""},
-                *self.conversation_history[-5:],  # Son 5 konuşma
-                {"role": "user", "content": text}
-            ]
+            if not text:
+                logger.warning("Boş metin için GPT yanıtı istenemez")
+                return None, False
 
-            # GPT'den yanıt al
-            response = openai_client.chat.completions.create(
-                model="gpt-4",
-                messages=messages,
-                temperature=0.7,
-                max_tokens=1000
-            )
-
-            gpt_response = response.choices[0].message.content.strip()
+            # Konuşma geçmişini kontrol et
+            is_first_interaction = len(self.conversation_history) <= 1
             
-            # Yanıt kontrolü ve soru takibi
-            if not self.question_answered and self.current_question_index < len(self.interview_questions):
-                # Yanıt analizi yap
-                analysis_prompt = f"""
-                Az önceki yanıt, mevcut soru için yeterli mi değerlendir:
-                Soru: {self.interview_questions[self.current_question_index]}
-                Yanıt: {text}
-                
-                Sadece "EVET" veya "HAYIR" olarak cevap ver.
-                """
-                
-                analysis = openai_client.chat.completions.create(
-                    model="gpt-4",
-                    messages=[{"role": "user", "content": analysis_prompt}],
-                    temperature=0.1,
-                    max_tokens=10
-                )
-                
-                if "EVET" in analysis.choices[0].message.content:
-                    self.question_answered = True
-                    self.current_question_index += 1
-                    self.off_topic_count = 0
-                else:
-                    self.off_topic_count += 1
-                    
-                    if self.off_topic_count >= self.max_off_topic_count:
-                        # Nazikçe soruya geri döndür
-                        gpt_response = f"""Anlıyorum, ancak şu konuya odaklanmamız gerekiyor: 
-                        {self.interview_questions[self.current_question_index]}
-                        Lütfen bu soru hakkında biraz daha detaylı bilgi verir misiniz?"""
-                        self.off_topic_count = 0
+            # Selamlama veya hazır olma durumunu kontrol et
+            greeting_keywords = ["merhaba", "selam", "günaydın", "iyi günler", "iyi akşamlar"]
+            ready_keywords = ["hazırım", "başlayabiliriz", "evet", "tamam"]
+            not_ready_keywords = ["hazır değilim", "bekleyin", "hayır", "durun", "anlamadım"]
+            
+            # Metni küçük harfe çevir ve kontrol et
+            text_lower = text.lower().strip()
+            
+            # Eğer ilk etkileşimse veya selamlama varsa
+            if is_first_interaction or any(keyword in text_lower for keyword in greeting_keywords):
+                greeting_response = f"Merhaba {self.candidate_name}, hoş geldiniz! Ben sizin mülakat uzmanınızım. Öncelikle kendinizi rahat hissetmenizi istiyorum, bu sadece bir sohbet. Başlamak için hazır olduğunuzda bana haber verebilirsiniz. Nasılsınız?"
+                self.conversation_history.append({"role": "user", "content": text})
+                self.conversation_history.append({"role": "assistant", "content": greeting_response})
+                return greeting_response, False
+            
+            # Hazır değilse
+            if any(keyword in text_lower for keyword in not_ready_keywords):
+                wait_response = "Anlıyorum, acele etmeyelim. Kendinizi hazır hissettiğinizde başlayabiliriz. Ben buradayım, istediğiniz zaman devam edebiliriz."
+                self.conversation_history.append({"role": "user", "content": text})
+                self.conversation_history.append({"role": "assistant", "content": wait_response})
+                return wait_response, False
+            
+            # Hazırsa ve mülakat henüz başlamamışsa
+            if self.current_question_index == 0 and any(keyword in text_lower for keyword in ready_keywords):
+                start_response = f"Harika! O zaman başlayalım. {self.candidate_name}, öncelikle bize biraz kendinizden ve kariyerinizden bahseder misiniz?"
+                self.conversation_history.append({"role": "user", "content": text})
+                self.conversation_history.append({"role": "assistant", "content": start_response})
+                self.current_question_index += 1
+                return start_response, False
 
-            # Yanıtı kaydet
+            # Normal mülakat akışı
             self.conversation_history.append({"role": "user", "content": text})
+            
+            # GPT'den yanıt al
+            response = await asyncio.get_event_loop().run_in_executor(
+                None,
+                lambda: openai_client.chat.completions.create(
+                    model="gpt-4",
+                    messages=[
+                        {"role": "system", "content": f"""Sen deneyimli ve empatik bir İK uzmanısın. {self.candidate_name} ile {self.position} pozisyonu için mülakat yapıyorsun.
+                        
+                        Önemli Kurallar:
+                        1. Her yanıtı dikkatle dinle ve anlamaya çalış
+                        2. Yanıtla ilgili kısa bir yorum yap
+                        3. Eğer yanıt yetersizse, nazikçe detay iste
+                        4. Yanıt anlaşılmazsa, açıklama iste
+                        5. Aday hazır olduğunda ve yanıt tamamsa, doğal bir geçişle diğer soruya geç
+                        
+                        Şu anki soru: {self.interview_questions[self.current_question_index-1] if self.current_question_index > 0 else "Henüz soru sorulmadı"}"""},
+                        *self.conversation_history[-5:],  # Son 5 mesajı kullan
+                    ],
+                    temperature=0.9,
+                    max_tokens=250
+                )
+            )
+            
+            gpt_response = response.choices[0].message.content
+            
+            # Cevabı değerlendir ve metrikleri güncelle
+            await self._analyze_sentiment(text)
+            
+            # Mülakat tamamlandı mı kontrol et
+            if self.current_question_index >= len(self.interview_questions):
+                final_message = """Görüşmemizi burada sonlandıralım. Paylaştığınız değerli bilgiler ve ayırdığınız zaman için çok teşekkür ederim. Size en kısa sürede dönüş yapacağız. MÜLAKAT_BİTTİ"""
+                self.conversation_history.append({"role": "assistant", "content": final_message})
+                return final_message, True
+            
+            # Yanıtı kaydet
             self.conversation_history.append({"role": "assistant", "content": gpt_response})
             
-            return gpt_response
-
+            return gpt_response, False
+            
         except Exception as e:
             logger.error(f"GPT yanıt hatası: {str(e)}")
-            return "Üzgünüm, bir hata oluştu. Lütfen soruyu tekrar eder misiniz?"
+            return "Üzgünüm, bir hata oluştu. Sorunuzu tekrar edebilir misiniz?", False
 
     async def _analyze_sentiment(self, text):
         """Metni analiz et ve metrikleri güncelle"""
@@ -998,39 +1007,24 @@ def verify_code():
 async def start_interview():
     try:
         data = request.json
-        if not data or 'candidate_name' not in data or 'position' not in data:
+        if not data or 'code' not in data:
             return jsonify({
                 "success": False,
-                "error": "Aday adı ve pozisyon bilgisi gerekli"
+                "error": "Mülakat kodu gerekli"
             }), 400
 
         global current_interview
         current_interview = InterviewAssistant()
-        current_interview.set_interview_details(
-            data['candidate_name'],
-            data['position']
-        )
+        current_interview.set_interview_details(data['code'])
         
-        # Soruları hazırla ve kaydet
-        interview_code = ''.join(random.choices(string.ascii_uppercase + string.digits, k=8))
-        questions_file = os.path.join('interviews', f'{interview_code}.json')
+        # Hoşgeldin mesajını al
+        welcome_message = current_interview.conversation_history[0]['content'] if current_interview.conversation_history else "Hoş geldiniz!"
         
-        if not os.path.exists('interviews'):
-            os.makedirs('interviews')
-            
-        with open(questions_file, 'w', encoding='utf-8') as f:
-            json.dump({
-                'candidate_name': data['candidate_name'],
-                'position': data['position'],
-                'questions': current_interview.interview_questions
-            }, f, ensure_ascii=False, indent=2)
-        
-        logger.info(f"Mülakat başlatıldı: {data['candidate_name']} - {data['position']}")
+        logger.info(f"Mülakat başlatıldı: {data['code']}")
         
         return jsonify({
             "success": True,
-            "message": "Mülakat başarıyla başlatıldı",
-            "code": interview_code
+            "welcome_message": welcome_message
         })
         
     except Exception as e:
