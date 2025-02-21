@@ -240,7 +240,7 @@ class VoiceAssistant:
             # OpenAI TTS API çağrısı
             response = self.openai_client.audio.speech.create(
                 model="tts-1",
-                voice="shimmer",
+                voice="nova",
                 input=text
             )
             
@@ -1136,7 +1136,7 @@ async def process_audio():
                     speech_file_path = "temp/temp_speech.mp3"
                     tts_response = openai_client.audio.speech.create(
                         model="tts-1",
-                        voice="shimmer",
+                        voice="nova",
                         input=gpt_response
                     )
                     tts_response.stream_to_file(speech_file_path)
@@ -2159,7 +2159,7 @@ async def get_speech():
             # OpenAI TTS ile sesi oluştur
             tts_response = openai_client.audio.speech.create(
                 model="tts-1",
-                voice="shimmer",
+                voice="nova",
                 input=text
             )
             
@@ -2217,3 +2217,4 @@ if __name__ == '__main__':
         if 'observer' in locals() and observer:
             observer.stop()
             observer.join()
+            
