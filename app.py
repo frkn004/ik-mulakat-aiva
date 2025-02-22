@@ -19,7 +19,7 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.mime.application import MIMEApplication
 from reportlab.lib import colors
-from reportlab.lib.pagesizes import A4
+from reportlab.lib.pagesizes import A4, letter
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from asgiref.wsgi import WsgiToAsgi
@@ -40,6 +40,7 @@ import playsound
 import wave
 import tempfile
 from functools import wraps
+import re
 
 # Flask ve async ayarları
 app = Flask(__name__)
@@ -321,20 +322,6 @@ class InterviewAssistant(VoiceAssistant):
             # Özel soruları kullan
             self.interview_questions = self.custom_questions
 
-            # Hoşgeldin mesajını hazırla
-            welcome_message = f"""Merhaba {self.candidate_name}, {self.position} pozisyonu için mülakatımıza hoş geldiniz. 
-            
-            Özgeçmişinizde belirttiğiniz {self.cv_summary} bilgilerine dayanarak, pozisyonun gerektirdiği {', '.join(self.requirements)} yetkinlikleri hakkında konuşacağız.
-            
-            {self.pre_info if self.pre_info else ''}
-            
-            Başlamak için hazır mısınız?"""
-
-            self.conversation_history.append({
-                "role": "assistant",
-                "content": welcome_message
-            })
-
             logger.info(f"Mülakat soruları hazırlandı: {len(self.interview_questions)} soru")
 
         except Exception as e:
@@ -348,147 +335,86 @@ class InterviewAssistant(VoiceAssistant):
                 "Zorlu bir iş durumunu nasıl çözdüğünüzü anlatır mısınız?",
                 "Gelecekteki kariyer hedefleriniz nelerdir?"
             ]
-            welcome_message = f"Merhaba {self.candidate_name}, {self.position} pozisyonu için mülakatımıza hoş geldiniz."
-            self.conversation_history.append({
-                "role": "assistant",
-                "content": welcome_message
-            })
 
     async def get_gpt_response(self, text):
-        """Mülakat bağlamında GPT yanıtını al"""
         try:
-            if not text:
-                logger.warning("Boş metin için GPT yanıtı istenemez")
-                return None, False
+            # Başlangıç kontrolü
+            if not hasattr(self, 'interview_started'):
+                if any(word in text.lower() for word in ["başlayalım", "başla", "hazırım", "başlayabiliriz"]):
+                    self.interview_started = True
+                    self.current_question_index = 0
+                    welcome_message = f"""Merhaba {self.candidate_name}, {self.position} pozisyonu için mülakatımıza hoş geldiniz.
 
-            # Konuşma geçmişini kontrol et
-            is_first_interaction = len(self.conversation_history) <= 1
-            
-            # Selamlama veya hazır olma durumunu kontrol et
-            greeting_keywords = ["merhaba", "selam", "günaydın", "iyi günler", "iyi akşamlar"]
-            ready_keywords = ["hazırım", "başlayabiliriz", "evet", "tamam"]
-            not_ready_keywords = ["hazır değilim", "bekleyin", "hayır", "durun", "anlamadım"]
-            
-            # Metni küçük harfe çevir ve kontrol et
-            text_lower = text.lower().strip()
-            
-            # Eğer ilk etkileşimse veya selamlama varsa
-            if is_first_interaction or any(keyword in text_lower for keyword in greeting_keywords):
-                greeting_response = f"Merhaba {self.candidate_name}, hoş geldiniz! Ben sizin mülakat uzmanınızım. Öncelikle kendinizi rahat hissetmenizi istiyorum, bu sadece bir sohbet. Başlamak için hazır olduğunuzda bana haber verebilirsiniz. Nasılsınız?"
-                self.conversation_history.append({"role": "user", "content": text})
-                self.conversation_history.append({"role": "assistant", "content": greeting_response})
-                return greeting_response, False
-            
-            # Hazır değilse
-            if any(keyword in text_lower for keyword in not_ready_keywords):
-                wait_response = "Anlıyorum, acele etmeyelim. Kendinizi hazır hissettiğinizde başlayabiliriz. Ben buradayım, istediğiniz zaman devam edebiliriz."
-                self.conversation_history.append({"role": "user", "content": text})
-                self.conversation_history.append({"role": "assistant", "content": wait_response})
-                return wait_response, False
-            
-            # Hazırsa ve mülakat henüz başlamamışsa
-            if self.current_question_index == 0 and any(keyword in text_lower for keyword in ready_keywords):
-                start_response = f"Harika! O zaman başlayalım. {self.candidate_name}, öncelikle bize biraz kendinizden ve kariyerinizden bahseder misiniz?"
-                self.conversation_history.append({"role": "user", "content": text})
-                self.conversation_history.append({"role": "assistant", "content": start_response})
+Özgeçmişinizde belirttiğiniz bilgilere dayanarak, pozisyonun gerektirdiği yetkinlikler hakkında konuşacağız.
+
+İlk olarak, {self.interview_questions[self.current_question_index]}"""
+                    return welcome_message, False
+                else:
+                    return "Mülakata başlamak için 'Başlayalım' diyebilirsiniz.", False
+
+            # Tekrar isteği kontrolü
+            if any(phrase in text.lower() for phrase in ["tekrar", "anlamadım", "tekrarlar mısın", "bir daha söyler misin"]):
+                return f"Tabii ki, soruyu tekrar ediyorum: {self.interview_questions[self.current_question_index]}", False
+
+            # Kısa cevap kontrolü
+            if len(text.split()) < 5:
+                follow_up_responses = [
+                    "Bu konu hakkında biraz daha detay verebilir misiniz?",
+                    "İlginç, peki bu konuda başka neler söylemek istersiniz?",
+                    "Deneyimlerinizden örnekler verebilir misiniz?",
+                    "Bu konuyu biraz daha açar mısınız?"
+                ]
+                return random.choice(follow_up_responses), False
+
+            # Bir sonraki soruya geçiş
+            if self.current_question_index < len(self.interview_questions) - 1:
                 self.current_question_index += 1
-                return start_response, False
+                transition_phrases = [
+                    f"Anlıyorum, teşekkür ederim. Şimdi başka bir konuya geçelim. {self.interview_questions[self.current_question_index]}",
+                    f"Bu konudaki görüşleriniz için teşekkürler. Peki, {self.interview_questions[self.current_question_index]}",
+                    f"Güzel bir açıklama oldu. İsterseniz şimdi {self.interview_questions[self.current_question_index]}",
+                    f"Teşekkür ederim. Bir sonraki konumuz: {self.interview_questions[self.current_question_index]}"
+                ]
+                return random.choice(transition_phrases), False
+            else:
+                closing_message = """Mülakat sorularımız tamamlandı. Paylaştığınız değerli bilgiler ve ayırdığınız zaman için teşekkür ederiz. 
+                
+Değerlendirme sonucunu en kısa sürede size ileteceğiz. İyi günler dilerim."""
+                return closing_message, True
 
-            # Normal mülakat akışı
-            self.conversation_history.append({"role": "user", "content": text})
-            
-            # GPT'den yanıt al
+        except Exception as e:
+            logger.error(f"GPT yanıtı alma hatası: {str(e)}")
+            return "Üzgünüm, bir hata oluştu. Lütfen tekrar dener misiniz?", False
+
+    def prepare_conversation_context(self, text):
+        return [
+            {"role": "system", "content": f"Sen bir mülakat uzmanısın. {self.position} pozisyonu için mülakat yapıyorsun."},
+            {"role": "user", "content": text}
+        ]
+
+    async def _analyze_sentiment(self, text):
+        """Adayın cevaplarını analiz et"""
+        try:
             response = await asyncio.get_event_loop().run_in_executor(
                 None,
                 lambda: openai_client.chat.completions.create(
                     model="gpt-4",
                     messages=[
-                        {"role": "system", "content": f"""Sen deneyimli ve empatik bir İK uzmanısın. {self.candidate_name} ile {self.position} pozisyonu için mülakat yapıyorsun.
-                        
-                        Önemli Kurallar:
-                        1. Her yanıtı dikkatle dinle ve anlamaya çalış
-                        2. Yanıtla ilgili kısa bir yorum yap
-                        3. Eğer yanıt yetersizse, nazikçe detay iste
-                        4. Yanıt anlaşılmazsa, açıklama iste
-                        5. Aday hazır olduğunda ve yanıt tamamsa, doğal bir geçişle diğer soruya geç
-                        
-                        Şu anki soru: {self.interview_questions[self.current_question_index-1] if self.current_question_index > 0 else "Henüz soru sorulmadı"}"""},
-                        *self.conversation_history[-5:],  # Son 5 mesajı kullan
+                        {"role": "system", "content": "Verilen metni analiz et ve duygusal durumu değerlendir."},
+                        {"role": "user", "content": text}
                     ],
-                    temperature=0.9,
-                    max_tokens=250
+                    temperature=0.7,
+                    max_tokens=100
                 )
             )
             
-            gpt_response = response.choices[0].message.content
-            
-            # Cevabı değerlendir ve metrikleri güncelle
-            await self._analyze_sentiment(text)
-            
-            # Mülakat tamamlandı mı kontrol et
-            if self.current_question_index >= len(self.interview_questions):
-                final_message = """Görüşmemizi burada sonlandıralım. Paylaştığınız değerli bilgiler ve ayırdığınız zaman için çok teşekkür ederim. Size en kısa sürede dönüş yapacağız. MÜLAKAT_BİTTİ"""
-                self.conversation_history.append({"role": "assistant", "content": final_message})
-                return final_message, True
-            
-            # Yanıtı kaydet
-            self.conversation_history.append({"role": "assistant", "content": gpt_response})
-            
-            return gpt_response, False
-            
-        except Exception as e:
-            logger.error(f"GPT yanıt hatası: {str(e)}")
-            return "Üzgünüm, bir hata oluştu. Sorunuzu tekrar edebilir misiniz?", False
-
-    async def _analyze_sentiment(self, text):
-        """Metni analiz et ve metrikleri güncelle"""
-        try:
-            # Analiz promptu
-            sentiment_prompt = f"""
-            Lütfen aşağıdaki cevabı analiz et ve şu metrikleri 0-100 arası puanla:
-            
-            Pozisyon: {self.position}
-            Soru: {self.interview_questions[self.current_question_index-1] if self.current_question_index > 0 else "Giriş sorusu"}
-            Cevap: "{text}"
-            
-            Şu formatta JSON yanıt ver:
-            {{
-                "iletisim_becerisi": [puan],
-                "ozguven": [puan],
-                "teknik_bilgi": [puan],
-                "yorum": "[kısa değerlendirme]"
-            }}
-            """
-            
-            response = await openai_client.chat.completions.acreate(
-                model="gpt-4",
-                messages=[
-                    {"role": "system", "content": "Sen bir kıdemli yazılım mühendisi ve mülakat uzmanısın."},
-                    {"role": "user", "content": sentiment_prompt}
-                ],
-                temperature=0.3,
-                max_tokens=150
-            )
-            
-            # JSON yanıtı parse et
-            analysis = json.loads(response.choices[0].message.content)
-            
-            # Metrikleri güncelle
-            self.sentiment_scores.append(analysis)
-            
-            # Ortalama puanları hesapla
-            total_scores = len(self.sentiment_scores)
-            self.metrics = {
-                "iletisim_puani": sum(s["iletisim_becerisi"] for s in self.sentiment_scores) / total_scores,
-                "ozguven_puani": sum(s["ozguven"] for s in self.sentiment_scores) / total_scores,
-                "teknik_bilgi": sum(s["teknik_bilgi"] for s in self.sentiment_scores) / total_scores
-            }
-            self.metrics["genel_puan"] = sum(self.metrics.values()) / 3
-            
-            logger.debug(f"Metrikler güncellendi: {self.metrics}")
+            sentiment = response.choices[0].message.content
+            logger.info(f"Duygu analizi sonucu: {sentiment}")
+            return sentiment
             
         except Exception as e:
             logger.error(f"Duygu analizi hatası: {str(e)}")
+            return None
 
     async def process_interview_response(self, text):
         """Mülakat yanıtını işle ve değerlendir"""
@@ -759,34 +685,30 @@ def join():
 def interview():
     code = request.args.get('code')
     if not code:
-        return "Mülakat kodu gereklidir", 400
+        return render_template('error.html', error="Mülakat kodu gereklidir"), 400
         
     try:
-        # Önce memory'de kontrol et
-        if code not in interview_data:
-            # JSON dosyasından okuma yapalım
-            json_path = os.path.join('interviews', f'{code}.json')
-            if os.path.exists(json_path):
-                with open(json_path, 'r', encoding='utf-8') as f:
-                    interview_json = json.load(f)
-                    
-                # Interview data'yı güncelle
-                interview_data[code] = {
-                    "candidate_info": {
-                        "name": interview_json.get("candidate_name"),
-                        "position": interview_json.get("position"),
-                        "requirements": interview_json.get("requirements", []),
-                        "custom_questions": interview_json.get("questions", [])
-                    },
-                    "created_at": interview_json.get("created_at", datetime.now().isoformat()),
-                    "expires_at": (datetime.now() + timedelta(hours=24)).isoformat(),
-                    "status": "active"
-                }
-            else:
-                return "Geçersiz veya süresi dolmuş mülakat kodu", 404
-
-        interview = interview_data[code]
+        # JSON dosyasından mülakat verilerini al
+        json_path = os.path.join('interviews', f'{code}.json')
+        if not os.path.exists(json_path):
+            return render_template('error.html', error="Geçersiz mülakat kodu"), 404
+            
+        with open(json_path, 'r', encoding='utf-8') as f:
+            interview_data = json.load(f)
+            
+        # Mülakat durumunu kontrol et
+        if interview_data.get('status') == 'completed' or interview_data.get('ended'):
+            return render_template('error.html', 
+                error="Bu mülakat daha önce tamamlanmış. Aynı mülakat kodunu tekrar kullanamazsınız."), 403
+            
+        # Interview data'yı güncelle
+        interview_data['status'] = 'active'
+        interview_data['started_at'] = datetime.now().isoformat()
         
+        # Değişiklikleri kaydet
+        with open(json_path, 'w', encoding='utf-8') as f:
+            json.dump(interview_data, f, ensure_ascii=False, indent=2)
+            
         # Global current_interview'ı oluştur
         global current_interview
         current_interview = InterviewAssistant()
@@ -794,15 +716,15 @@ def interview():
         
         return render_template('interview.html', 
                              interview={
-                                 "candidate_name": interview["candidate_info"]["name"],
-                                 "position": interview["candidate_info"]["position"],
+                                 "candidate_name": interview_data.get("candidate_name"),
+                                 "position": interview_data.get("position"),
                                  "code": code,
-                                 "created_at": interview["created_at"]
+                                 "created_at": interview_data.get("created_at")
                              })
                              
     except Exception as e:
         logger.error(f"Mülakat sayfası yükleme hatası: {str(e)}")
-        return "Mülakat yüklenirken bir hata oluştu", 500
+        return render_template('error.html', error="Mülakat yüklenirken bir hata oluştu"), 500
 
 @app.route('/create_interview', methods=['GET', 'POST'])
 @login_required
@@ -955,7 +877,7 @@ def verify_code():
         if not code:
             return jsonify({
                 'success': False,
-                'error': 'Mülakat kodu gereklidir'
+                'error': 'Mülakat kodu gerekli'
             })
 
         try:
@@ -1018,7 +940,7 @@ async def start_interview():
         current_interview.set_interview_details(data['code'])
         
         # Hoşgeldin mesajını al
-        welcome_message = current_interview.conversation_history[0]['content'] if current_interview.conversation_history else "Hoş geldiniz!"
+        welcome_message = "Merhaba, mülakata başlamak için hazır olduğunuzda 'Başlayalım' diyebilirsiniz."
         
         logger.info(f"Mülakat başlatıldı: {data['code']}")
         
@@ -1068,19 +990,8 @@ async def start_recording():
 @app.route('/process_audio', methods=['POST'])
 async def process_audio():
     try:
-        # Mülakat kodunu al
-        interview_code = request.form.get('interview_code')
-        if not interview_code:
-            logger.error("Mülakat kodu bulunamadı")
-            return jsonify({
-                'success': False,
-                'error': 'Mülakat kodu gerekli'
-            })
-
-        # Ses dosyasını al
         audio_file = request.files.get('audio')
         if not audio_file:
-            logger.error("Ses dosyası bulunamadı")
             return jsonify({
                 'success': False,
                 'error': 'Ses dosyası gerekli'
@@ -1121,6 +1032,16 @@ async def process_audio():
 
             logger.info(f"GPT yanıtı: {gpt_response}")
 
+            # Konuşma geçmişini kaydet
+            current_interview.conversation_history.append({
+                "role": "user",
+                "content": transcript
+            })
+            current_interview.conversation_history.append({
+                "role": "assistant",
+                "content": gpt_response
+            })
+
             # Yanıtı hemen gönder
             response_data = {
                 'success': True,
@@ -1130,32 +1051,13 @@ async def process_audio():
                 'continue_listening': True  # Her zaman dinlemeye devam et
             }
 
-            # Ses dosyasını arka planda oluştur ve çal
-            async def generate_and_play_speech():
-                try:
-                    speech_file_path = "temp/temp_speech.mp3"
-                    tts_response = openai_client.audio.speech.create(
-                        model="tts-1",
-                        voice="nova",
-                        input=gpt_response
-                    )
-                    tts_response.stream_to_file(speech_file_path)
-                    playsound.playsound(speech_file_path)
-                    if os.path.exists(speech_file_path):
-                        os.remove(speech_file_path)
-                except Exception as e:
-                    logger.error(f"Ses oluşturma/çalma hatası: {str(e)}")
-
-            # Ses oluşturma ve çalma işlemini arka planda başlat
-            asyncio.create_task(generate_and_play_speech())
-
             return jsonify(response_data)
 
         except Exception as e:
             logger.error(f"Ses işleme hatası: {str(e)}")
             return jsonify({
                 'success': False,
-                'error': 'Ses işlenemedi',
+                'error': str(e),
                 'continue_listening': True  # Hata durumunda bile dinlemeye devam et
             })
 
@@ -1179,226 +1081,207 @@ async def process_audio():
 @app.route('/generate_report', methods=['POST'])
 async def generate_report():
     try:
-        logger.info("Rapor oluşturma süreci başlatıldı...")
+        logging.info("Rapor oluşturma süreci başlatıldı...")
         
-        if not current_interview:
-            error_msg = "Mülakat oturumu bulunamadı"
-            logger.error(error_msg)
-            return jsonify({
-                "success": False,
-                "error": error_msg
-            }), 400
-
-        # Konuşma geçmişini al
-        conversation_history = request.json.get('conversation_history', [])
+        # İstek verilerini al
+        data = request.get_json()
+        interview_code = data.get('interview_code')
+        conversation_history = data.get('conversation_history', [])
+        
+        if not interview_code:
+            return jsonify({'success': False, 'error': 'Mülakat kodu gerekli'}), 400
+            
+        # Mülakat dosyasını kontrol et
+        interview_file = f'interviews/{interview_code}.json'
+        if not os.path.exists(interview_file):
+            return jsonify({'success': False, 'error': 'Mülakat bulunamadı'}), 404
+            
+        # Mülakat verilerini oku
+        with open(interview_file, 'r', encoding='utf-8') as f:
+            interview_data = json.load(f)
+            
         if not conversation_history:
-            error_msg = "Konuşma geçmişi boş"
-            logger.error(error_msg)
-            return jsonify({
-                "success": False,
-                "error": error_msg
-            }), 400
+            return jsonify({'success': False, 'error': 'Konuşma geçmişi boş'}), 400
             
-        logger.info("Konuşma geçmişi alındı, GPT değerlendirmesi başlıyor...")
+        # GPT değerlendirmesi için prompt hazırla
+        prompt = f"""
+        Aşağıdaki mülakat için detaylı bir değerlendirme raporu hazırla:
         
-        try:
-            # GPT ile değerlendirme yap
-            logger.info("GPT değerlendirmesi başlatılıyor...")
-            evaluation_prompt = f"""
-            Aşağıdaki mülakat konuşmasını değerlendir ve bir rapor oluştur:
+        Aday: {interview_data.get('candidate_name')}
+        Pozisyon: {interview_data.get('position')}
+        Tarih: {interview_data.get('created_at')}
+        
+        Mülakat Konuşma Akışı:
+        """
+        
+        # Konuşma akışını ekle
+        for message in conversation_history:
+            role = "Aday" if message['role'] == 'user' else "Mülakat Asistanı"
+            prompt += f"\n{role}: {message['content']}\n"
             
-            Aday: {current_interview.candidate_name if current_interview else "Bilinmiyor"}
-            Pozisyon: {current_interview.position if current_interview else "Bilinmiyor"}
+        prompt += """
+        Lütfen aşağıdaki kriterlere göre değerlendirme yap:
+        1. Teknik Yetkinlik (1-10)
+        2. İletişim Becerileri (1-10)
+        3. Problem Çözme (1-10)
+        4. Deneyim Seviyesi (1-10)
+        
+        Her kriter için detaylı açıklama ve örnekler ver.
+        Güçlü yönler ve gelişim alanlarını belirt.
+        Genel değerlendirme ve tavsiyeler ekle.
+        """
+        
+        # GPT'den değerlendirme al
+        client = OpenAI()
+        response = await client.chat.completions.create(
+            model="gpt-4-turbo-preview",
+            messages=[{"role": "system", "content": "Sen bir mülakat değerlendirme uzmanısın."},
+                     {"role": "user", "content": prompt}],
+            temperature=0.7,
+            max_tokens=2000
+        )
+        
+        evaluation_text = response.choices[0].message.content
+        
+        # Skorları ve bölümleri çıkar
+        scores = {
+            'technical': extract_score(evaluation_text, 'Teknik Yetkinlik'),
+            'communication': extract_score(evaluation_text, 'İletişim Becerileri'),
+            'problem_solving': extract_score(evaluation_text, 'Problem Çözme'),
+            'experience': extract_score(evaluation_text, 'Deneyim Seviyesi')
+        }
+        
+        sections = {
+            'strengths': extract_section(evaluation_text, 'Güçlü Yönler'),
+            'improvements': extract_section(evaluation_text, 'Gelişim Alanları'),
+            'overall': extract_section(evaluation_text, 'Genel Değerlendirme')
+        }
+        
+        # Genel skoru hesapla
+        overall_score = calculate_overall_score(scores)
+        
+        # PDF rapor dosya adını oluştur
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        pdf_filename = f"report_{interview_code}_{timestamp}.pdf"
+        pdf_path = os.path.join('reports', pdf_filename)
+        
+        # PDF raporu oluştur
+        doc = SimpleDocTemplate(pdf_path, pagesize=letter)
+        styles = getSampleStyleSheet()
+        elements = []
+        
+        # Başlık
+        elements.append(Paragraph(f"Mülakat Değerlendirme Raporu", styles['Title']))
+        elements.append(Spacer(1, 12))
+        
+        # Aday Bilgileri
+        elements.append(Paragraph(f"Aday: {interview_data.get('candidate_name')}", styles['Heading2']))
+        elements.append(Paragraph(f"Pozisyon: {interview_data.get('position')}", styles['Normal']))
+        elements.append(Paragraph(f"Tarih: {interview_data.get('created_at')}", styles['Normal']))
+        elements.append(Spacer(1, 12))
+        
+        # Skorlar
+        elements.append(Paragraph("Değerlendirme Skorları", styles['Heading2']))
+        for category, score in scores.items():
+            elements.append(Paragraph(f"{category.replace('_', ' ').title()}: {score}/10", styles['Normal']))
+        elements.append(Paragraph(f"Genel Skor: {overall_score}/10", styles['Normal']))
+        elements.append(Spacer(1, 12))
+        
+        # Detaylı Değerlendirme
+        elements.append(Paragraph("Detaylı Değerlendirme", styles['Heading2']))
+        for section, content in sections.items():
+            elements.append(Paragraph(f"{section.replace('_', ' ').title()}", styles['Heading3']))
+            elements.append(Paragraph(content, styles['Normal']))
+            elements.append(Spacer(1, 12))
             
-            İş İlanı Gereksinimleri:
-            {json.dumps(current_interview.requirements if current_interview else [], indent=2, ensure_ascii=False)}
-            
-            Konuşma Geçmişi:
-            {json.dumps(conversation_history, indent=2, ensure_ascii=False)}
-            
-            Lütfen aşağıdaki başlıklara göre değerlendirme yap:
-            1. Teknik Bilgi ve Deneyim (100 üzerinden puan ver)
-            2. İletişim Becerileri (100 üzerinden puan ver)
-            3. Problem Çözme Yeteneği (100 üzerinden puan ver)
-            4. Pozisyon Gereksinimlerine Uygunluk (100 üzerinden puan ver)
-            5. Güçlü Yönler
-            6. Geliştirilmesi Gereken Yönler
-            7. Genel Değerlendirme ve Tavsiye
-            
-            Yanıtı JSON formatında ver.
-            """
-            
-            evaluation_response = await asyncio.get_event_loop().run_in_executor(
-                None,
-                lambda: openai_client.chat.completions.create(
-                    model="gpt-4",
-                    messages=[
-                        {"role": "system", "content": "Sen bir kıdemli yazılım mühendisi ve mülakat uzmanısın."},
-                        {"role": "user", "content": evaluation_prompt}
-                    ],
-                    temperature=0.7,
-                    max_tokens=2000
-                )
-            )
-            
-            evaluation = evaluation_response.choices[0].message.content
-            evaluation_data = json.loads(evaluation)
-            logger.info("GPT değerlendirmesi tamamlandı")
+        # Konuşma Akışı
+        elements.append(Paragraph("Mülakat Konuşma Akışı", styles['Heading2']))
+        for message in conversation_history:
+            role = "Aday" if message['role'] == 'user' else "Mülakat Asistanı"
+            elements.append(Paragraph(f"{role}:", styles['Heading4']))
+            elements.append(Paragraph(message['content'], styles['Normal']))
+            elements.append(Spacer(1, 6))
+        
+        # PDF'i oluştur
+        doc.build(elements)
+        
+        # Webhook URL'sini kontrol et
+        webhook_url = interview_data.get('webhook_rapor_url') or os.getenv('WEBHOOK_RAPOR_URL')
+        
+        if webhook_url:
+            # Webhook verilerini hazırla
+            webhook_data = {
+                'interview_code': interview_code,
+                'candidate_name': interview_data.get('candidate_name'),
+                'position': interview_data.get('position'),
+                'date': interview_data.get('created_at'),
+                'evaluation': {
+                    'scores': scores,
+                    'overall_score': overall_score,
+                    'sections': sections
+                },
+                'pdf_path': pdf_path
+            }
             
             try:
-                # PDF oluştur
-                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                pdf_path = os.path.join('reports', f"mulakat_raporu_{timestamp}.pdf")
-                
-                # PDF oluşturma işlemleri...
-                # PDF oluştur
-                doc = SimpleDocTemplate(pdf_path, pagesize=A4)
-                styles = getSampleStyleSheet()
-                story = []
-                
-                # Başlık
-                title_style = ParagraphStyle(
-                    'CustomTitle',
-                    parent=styles['Heading1'],
-                    fontSize=24,
-                    spaceAfter=30
-                )
-                story.append(Paragraph("Mülakat Değerlendirme Raporu", title_style))
-                story.append(Spacer(1, 12))
-                
-                # Aday Bilgileri
-                info_style = ParagraphStyle(
-                    'Info',
-                    parent=styles['Normal'],
-                    fontSize=12,
-                    spaceAfter=6
-                )
-                story.append(Paragraph(f"Aday: {current_interview.candidate_name if current_interview else 'Bilinmiyor'}", info_style))
-                story.append(Paragraph(f"Pozisyon: {current_interview.position if current_interview else 'Bilinmiyor'}", info_style))
-                story.append(Paragraph(f"Tarih: {datetime.now().strftime('%d.%m.%Y %H:%M')}", info_style))
-                story.append(Spacer(1, 20))
-                
-                # Değerlendirme Puanları
-                story.append(Paragraph("Değerlendirme Puanları", styles['Heading2']))
-                story.append(Spacer(1, 12))
-                
-                metrics_data = [
-                    ["Değerlendirme Kriteri", "Puan"],
-                    ["Teknik Bilgi ve Deneyim", f"{evaluation_data.get('teknik_bilgi', 0)}/100"],
-                    ["İletişim Becerileri", f"{evaluation_data.get('iletisim_becerileri', 0)}/100"],
-                    ["Problem Çözme Yeteneği", f"{evaluation_data.get('problem_cozme', 0)}/100"],
-                    ["Pozisyon Uygunluğu", f"{evaluation_data.get('pozisyon_uygunlugu', 0)}/100"]
-                ]
-                
-                t = Table(metrics_data, colWidths=[300, 100])
-                t.setStyle(TableStyle([
-                    ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
-                    ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
-                    ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-                    ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-                    ('FONTSIZE', (0, 0), (-1, 0), 14),
-                    ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
-                    ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
-                    ('TEXTCOLOR', (0, 1), (-1, -1), colors.black),
-                    ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
-                    ('FONTSIZE', (0, 1), (-1, -1), 12),
-                    ('GRID', (0, 0), (-1, -1), 1, colors.black)
-                ]))
-                story.append(t)
-                story.append(Spacer(1, 20))
-                
-                # Detaylı Değerlendirme
-                story.append(Paragraph("Detaylı Değerlendirme", styles['Heading2']))
-                story.append(Spacer(1, 12))
-                
-                story.append(Paragraph("<b>Güçlü Yönler:</b>", styles['Normal']))
-                story.append(Paragraph(evaluation_data.get('guclu_yonler', ''), styles['Normal']))
-                story.append(Spacer(1, 12))
-                
-                story.append(Paragraph("<b>Geliştirilmesi Gereken Yönler:</b>", styles['Normal']))
-                story.append(Paragraph(evaluation_data.get('gelistirilmesi_gereken_yonler', ''), styles['Normal']))
-                story.append(Spacer(1, 12))
-                
-                story.append(Paragraph("<b>Genel Değerlendirme ve Tavsiye:</b>", styles['Normal']))
-                story.append(Paragraph(evaluation_data.get('genel_degerlendirme', ''), styles['Normal']))
-                story.append(Spacer(1, 20))
-                
-                # Konuşma Geçmişi
-                story.append(Paragraph("Mülakat Detayları", styles['Heading2']))
-                story.append(Spacer(1, 12))
-                
-                for entry in conversation_history:
-                    if entry["role"] == "user":
-                        story.append(Paragraph(f"<b>Aday:</b> {entry['content']}", styles['Normal']))
-                    else:
-                        story.append(Paragraph(f"<b>Mülakat Uzmanı:</b> {entry['content']}", styles['Normal']))
-                    story.append(Spacer(1, 12))
-                
-                # PDF oluştur
-                doc.build(story)
-                logger.info(f"PDF raporu başarıyla oluşturuldu: {pdf_path}")
-                
-                try:
-                    # Webhook'a gönder
-                    webhook_data = {
-                        "mulakat_kodu": current_interview.code if current_interview else "UNKNOWN",
-                        "aday_bilgileri": {
-                            "isim": current_interview.candidate_name if current_interview else "Bilinmiyor",
-                            "pozisyon": current_interview.position if current_interview else "Bilinmiyor",
-                            "tarih": datetime.now().isoformat()
-                        },
-                        "degerlendirme": evaluation_data,
-                        "rapor_dosyasi": pdf_path
-                    }
-                    
-                    webhook_response = requests.post(
-                        WEBHOOK_RAPOR_URL,
-                        json=webhook_data,
-                        headers={'Content-Type': 'application/json'}
-                    )
-                    
-                    if webhook_response.status_code == 200:
-                        logger.info("Rapor webhook'a başarıyla gönderildi")
-                    else:
-                        logger.error(f"Webhook hatası: {webhook_response.status_code} - {webhook_response.text}")
-                    
-                    return jsonify({
-                        "success": True,
-                        "message": "Rapor başarıyla oluşturuldu ve gönderildi",
-                        "pdf_path": pdf_path
-                    })
-                    
-                except Exception as e:
-                    error_msg = f"Webhook gönderme hatası: {str(e)}"
-                    logger.error(error_msg)
-                    return jsonify({
-                        "success": False,
-                        "error": error_msg
-                    }), 500
-                    
+                # Webhook'u gönder
+                webhook_response = requests.post(webhook_url, json=webhook_data, timeout=5)
+                webhook_response.raise_for_status()
+                logging.info(f"Webhook başarıyla gönderildi: {webhook_response.status_code}")
             except Exception as e:
-                error_msg = f"PDF oluşturma hatası: {str(e)}"
-                logger.error(error_msg)
-                return jsonify({
-                    "success": False,
-                    "error": error_msg
-                }), 500
-                
-        except Exception as e:
-            error_msg = f"GPT değerlendirme hatası: {str(e)}"
-            logger.error(error_msg)
-            return jsonify({
-                "success": False,
-                "error": error_msg
-            }), 500
-            
-    except Exception as e:
-        error_msg = f"Rapor oluşturma genel hatası: {str(e)}"
-        logger.error(error_msg)
+                logging.error(f"Webhook gönderimi başarısız: {str(e)}")
+        
         return jsonify({
-            "success": False,
-            "error": error_msg
-        }), 500
+            'success': True,
+            'pdf_path': pdf_path,
+            'evaluation': {
+                'scores': scores,
+                'overall_score': overall_score,
+                'sections': sections
+            }
+        })
+        
+    except Exception as e:
+        logging.error(f"Rapor oluşturma hatası: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+def extract_score(text, category):
+    """Metinden puan çıkarma"""
+    try:
+        pattern = f"{category}.*?(\d+)"
+        match = re.search(pattern, text, re.DOTALL)
+        if match:
+            score = int(match.group(1))
+            return min(max(score, 0), 100)  # 0-100 arası sınırla
+    except:
+        pass
+    return 0
+
+def extract_section(text, section):
+    """Metinden bölüm çıkarma"""
+    try:
+        pattern = f"{section}:(.*?)(?=\n\n|$)"
+        match = re.search(pattern, text, re.DOTALL)
+        if match:
+            return match.group(1).strip()
+    except:
+        pass
+    return ""
+
+def calculate_overall_score(evaluation_data):
+    """Genel puanı hesapla"""
+    weights = {
+        "teknik_bilgi_ve_deneyim": 0.4,
+        "iletisim_becerileri": 0.2,
+        "problem_cozme": 0.2,
+        "ozguven_profesyonellik": 0.2
+    }
+    
+    total_score = 0
+    for key, weight in weights.items():
+        total_score += evaluation_data.get(key, 0) * weight
+        
+    return round(total_score, 1)
 
 @app.route('/check_audio_support', methods=['GET'])
 def check_audio_support():
@@ -1512,6 +1395,12 @@ def webhook_aday_handler():
         if not data:
             return jsonify({"error": "Veri bulunamadı"}), 400
 
+        # Gerekli alanları kontrol et
+        required_fields = ['adSoyad', 'isIlaniPozisyonu']
+        for field in required_fields:
+            if field not in data:
+                return jsonify({"error": f"Eksik alan: {field}"}), 400
+
         # Mülakat kodu oluştur
         interview_code = generate_interview_code()
         
@@ -1547,14 +1436,17 @@ def webhook_aday_handler():
         
         # Webhook'a bildirim gönder
         try:
-            webhook_response = requests.post(
-                webhook_aday_url,
-                json=response_data,
-                headers={'Content-Type': 'application/json'}
-            )
-            logger.info(f"WebhookAdayİşlem yanıtı: {webhook_response.status_code}")
-        except Exception as e:
+            if webhook_aday_url:
+                webhook_response = requests.post(
+                    webhook_aday_url,
+                    json=response_data,
+                    headers={'Content-Type': 'application/json'},
+                    timeout=5  # 5 saniye timeout
+                )
+                logger.info(f"WebhookAdayİşlem yanıtı: {webhook_response.status_code}")
+        except requests.exceptions.RequestException as e:
             logger.error(f"WebhookAdayİşlem gönderme hatası: {str(e)}")
+            # Webhook hatası olsa bile işleme devam et
 
         return jsonify(response_data)
 
@@ -1967,183 +1859,37 @@ async def end_interview():
 
 # window.onbeforeunload event'i için endpoint
 @app.route('/save_interview_state', methods=['POST'])
-async def save_interview_state():
-    """Mülakat sayfası kapatıldığında çağrılır"""
+def save_interview_state():
     try:
         data = request.get_json()
-        interview_code = data.get('interview_code')
-        
-        if not interview_code:
-            return jsonify({
-                'success': False,
-                'error': 'Mülakat kodu gerekli'
-            }), 400
-            
-        # JSON dosyasını oku
-        json_path = os.path.join('interviews', f'{interview_code}.json')
-        if not os.path.exists(json_path):
-            return jsonify({
-                'success': False,
-                'error': 'Mülakat dosyası bulunamadı'
-            }), 404
-            
-        with open(json_path, 'r', encoding='utf-8') as f:
+        if not data or 'code' not in data:
+            return jsonify({'success': False, 'error': 'Mülakat kodu gerekli'}), 400
+
+        interview_code = data['code']
+        conversation_history = data.get('conversation_history', [])
+        ended = data.get('ended', False)
+
+        # Mülakat dosyasını güncelle
+        interview_file = os.path.join('interviews', f'{interview_code}.json')
+        if not os.path.exists(interview_file):
+            return jsonify({'success': False, 'error': 'Mülakat bulunamadı'}), 404
+
+        with open(interview_file, 'r', encoding='utf-8') as f:
             interview_data = json.load(f)
-        
-        # PDF raporu oluştur
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        pdf_path = os.path.join('reports', f"mulakat_raporu_{timestamp}.pdf")
-        
-        # PDF oluşturma işlemleri
-        doc = SimpleDocTemplate(pdf_path, pagesize=A4)
-        styles = getSampleStyleSheet()
-        story = []
-        
-        # Başlık
-        title_style = ParagraphStyle(
-            'CustomTitle',
-            parent=styles['Heading1'],
-            fontSize=24,
-            spaceAfter=30
-        )
-        story.append(Paragraph("Mülakat Değerlendirme Raporu", title_style))
-        story.append(Spacer(1, 12))
-        
-        # Aday Bilgileri
-        info_style = ParagraphStyle(
-            'Info',
-            parent=styles['Normal'],
-            fontSize=12,
-            spaceAfter=6
-        )
-        story.append(Paragraph(f"Aday: {interview_data.get('candidate_name')}", info_style))
-        story.append(Paragraph(f"Pozisyon: {interview_data.get('position')}", info_style))
-        story.append(Paragraph(f"Tarih: {datetime.now().strftime('%d.%m.%Y %H:%M')}", info_style))
-        story.append(Spacer(1, 20))
-        
-        # GPT ile değerlendirme yap
-        evaluation_prompt = f"""
-        Lütfen aşağıdaki mülakat verilerini analiz ederek detaylı bir değerlendirme raporu hazırla:
-        
-        Aday: {interview_data.get('candidate_name')}
-        Pozisyon: {interview_data.get('position')}
-        
-        Mülakat Konuşması:
-        {json.dumps(interview_data.get('conversation_history', []), indent=2, ensure_ascii=False)}
-        
-        Lütfen şu başlıklara göre değerlendirme yap:
-        1. Teknik Yetkinlik (100 üzerinden puan)
-        2. İletişim Becerileri (100 üzerinden puan)
-        3. Problem Çözme Yaklaşımı (100 üzerinden puan)
-        4. Güçlü Yönler
-        5. Geliştirilmesi Gereken Alanlar
-        6. Genel Değerlendirme ve İşe Uygunluk
-        
-        Yanıtı JSON formatında ver.
-        """
-        
-        completion = await asyncio.get_event_loop().run_in_executor(
-            None,
-            lambda: openai_client.chat.completions.create(
-                model="gpt-4",
-                messages=[
-                    {"role": "system", "content": "Sen bir kıdemli İK uzmanısın."},
-                    {"role": "user", "content": evaluation_prompt}
-                ],
-                temperature=0.7,
-                max_tokens=2000
-            )
-        )
-        
-        evaluation_data = json.loads(completion.choices[0].message.content)
-        
-        # Değerlendirme Puanları
-        story.append(Paragraph("Değerlendirme Puanları", styles['Heading2']))
-        story.append(Spacer(1, 12))
-        
-        metrics_data = [
-            ["Değerlendirme Kriteri", "Puan"],
-            ["Teknik Yetkinlik", f"{evaluation_data.get('teknik_yetkinlik', 0)}/100"],
-            ["İletişim Becerileri", f"{evaluation_data.get('iletisim_becerileri', 0)}/100"],
-            ["Problem Çözme", f"{evaluation_data.get('problem_cozme', 0)}/100"]
-        ]
-        
-        t = Table(metrics_data, colWidths=[300, 100])
-        t.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
-            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
-            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-            ('FONTSIZE', (0, 0), (-1, 0), 14),
-            ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
-            ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
-            ('TEXTCOLOR', (0, 1), (-1, -1), colors.black),
-            ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
-            ('FONTSIZE', (0, 1), (-1, -1), 12),
-            ('GRID', (0, 0), (-1, -1), 1, colors.black)
-        ]))
-        story.append(t)
-        story.append(Spacer(1, 20))
-        
-        # Detaylı Değerlendirme
-        story.append(Paragraph("Detaylı Değerlendirme", styles['Heading2']))
-        story.append(Spacer(1, 12))
-        
-        story.append(Paragraph("<b>Güçlü Yönler:</b>", styles['Normal']))
-        story.append(Paragraph(evaluation_data.get('guclu_yonler', ''), styles['Normal']))
-        story.append(Spacer(1, 12))
-        
-        story.append(Paragraph("<b>Geliştirilmesi Gereken Alanlar:</b>", styles['Normal']))
-        story.append(Paragraph(evaluation_data.get('gelistirilmesi_gereken_alanlar', ''), styles['Normal']))
-        story.append(Spacer(1, 12))
-        
-        story.append(Paragraph("<b>Genel Değerlendirme:</b>", styles['Normal']))
-        story.append(Paragraph(evaluation_data.get('genel_degerlendirme', ''), styles['Normal']))
-        
-        # PDF oluştur
-        doc.build(story)
-        
-        # Webhook'a gönderilecek veriyi hazırla
-        webhook_data = {
-            "mulakat_kodu": interview_code,
-            "aday_bilgileri": {
-                "isim": interview_data.get('candidate_name'),
-                "pozisyon": interview_data.get('position'),
-                "tarih": datetime.now().isoformat()
-            },
-            "degerlendirme": evaluation_data,
-            "rapor_dosyasi": pdf_path
-        }
-        
-        # Webhook'a gönder
-        webhook_response = requests.post(
-            WEBHOOK_RAPOR_URL,
-            json=webhook_data,
-            headers={'Content-Type': 'application/json'}
-        )
-        
-        if webhook_response.status_code != 200:
-            logger.error(f"Webhook hatası: {webhook_response.status_code} - {webhook_response.text}")
-        
+
         # Mülakat durumunu güncelle
-        interview_data['status'] = 'completed'
-        interview_data['report_path'] = pdf_path
-        
-        with open(json_path, 'w', encoding='utf-8') as f:
+        interview_data['conversation_history'] = conversation_history
+        interview_data['ended'] = ended
+        interview_data['last_updated'] = datetime.now().isoformat()
+
+        with open(interview_file, 'w', encoding='utf-8') as f:
             json.dump(interview_data, f, ensure_ascii=False, indent=2)
-        
-        return jsonify({
-            'success': True,
-            'message': 'Mülakat raporu oluşturuldu ve webhook\'a gönderildi',
-            'report_path': pdf_path
-        })
-        
+
+        return jsonify({'success': True})
+
     except Exception as e:
-        logger.error(f"Rapor oluşturma hatası: {str(e)}")
-        return jsonify({
-            'success': False,
-            'error': str(e)
-        }), 500
+        logger.error(f'Mülakat durumu kaydetme hatası: {str(e)}')
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/get_speech', methods=['GET'])
 async def get_speech():

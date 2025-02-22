@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AIVA Mülakat Asistanı</title>
+    <link rel="icon" type="image/x-icon" href="https://www.aivatech.io/wp-content/uploads/2023/09/AIVA-App-Logo1-1200-x-300piksel-1-1-1024x256.png">
     <link href="https://unpkg.com/tailwindcss@^2/dist/tailwind.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -712,6 +713,7 @@
         let realtimeSession = null;
         let interviewStartTime = null;
         let timerInterval = null;
+        let chatHistory = [];
 
         // WebSocket yerine SSE kullanımı
         async function initializeRealtimeSession() {
@@ -888,23 +890,28 @@
             // Tarayıcı kapandığında rapor oluştur
             window.addEventListener('beforeunload', async (event) => {
                 if (!interviewEnded) {
+                    // Sayfa yenileme veya kapatma durumunda rapor oluştur
                     event.preventDefault();
                     event.returnValue = '';
                     
                     try {
-                        // Rapor oluşturma isteği gönder
-                        await fetch('/generate_report', {
+                        // Mülakat durumunu kaydet
+                        await fetch('/save_interview_state', {
                             method: 'POST',
                             headers: {
                                 'Content-Type': 'application/json'
                             },
                             body: JSON.stringify({
-                                interview_code: interviewCode,
-                                auto_close: true
+                                code: interviewCode,
+                                conversation_history: chatHistory,
+                                ended: true
                             })
                         });
+                        
+                        // Rapor oluştur
+                        await generateReport();
                     } catch (error) {
-                        console.error('Rapor oluşturma hatası:', error);
+                        console.error('Mülakat sonlandırma hatası:', error);
                     }
                 }
             });
@@ -1364,17 +1371,12 @@
                 // İşlem aşamalarını göster
                 showProcessingSteps();
                 updateProcessingStep('transcribe', 'active');
+                updateAvatarState('processing');
 
                 const formData = new FormData();
                 formData.append('audio', audioBlob, 'audio.webm');
                 formData.append('code', interviewCode);
-                formData.append('interview_code', interviewCode);
 
-                console.log('Ses kaydı gönderiliyor...', {
-                    code: interviewCode,
-                    blobSize: audioBlob.size
-                });
-                
                 const response = await fetch('/process_audio', {
                     method: 'POST',
                     body: formData
@@ -1396,20 +1398,26 @@
                     updateProcessingStep('evaluate', 'active');
 
                     if (data.transcript) {
+                        // Önceki kullanıcı mesajlarını temizle
+                        const existingUserMessages = document.querySelectorAll('.chat-bubble.user-bubble');
+                        existingUserMessages.forEach(msg => {
+                            msg.classList.add('fade-out');
+                            setTimeout(() => msg.remove(), 300);
+                        });
+                        
+                        // Yeni kullanıcı mesajını ekle
                         addMessageToChat('user', data.transcript);
                     }
 
                     // Değerlendirme tamamlandı
                     updateProcessingStep('evaluate', 'completed');
                     updateProcessingStep('respond', 'active');
+                    updateAvatarState('speaking');
 
                     if (data.response) {
                         // GPT konuşmaya başlamadan önce ses algılamayı durdur
                         isGPTSpeaking = true;
                         stopVoiceDetection();
-                        
-                        addMessageToChat('assistant', data.response);
-                        updateAvatarState('speaking');
                         
                         // Yanıt hazır
                         updateProcessingStep('respond', 'completed');
@@ -1417,8 +1425,16 @@
                             hideProcessingSteps();
                         }, 1000);
 
-                        // Sadece speakResponse fonksiyonunu kullan
+                        // Önceki asistan mesajlarını temizle
+                        const existingAssistantMessages = document.querySelectorAll('.chat-bubble.assistant-bubble');
+                        existingAssistantMessages.forEach(msg => {
+                            msg.classList.add('fade-out');
+                            setTimeout(() => msg.remove(), 300);
+                        });
+
+                        // Önce sesi oynat, sonra mesajı göster
                         await speakResponse(data.response);
+                        addMessageToChat('assistant', data.response);
                     }
                     
                     if (data.interview_ended) {
@@ -1429,10 +1445,8 @@
                     hideProcessingSteps();
                     showError(data.error || 'Ses işlenemedi');
                     
-                    // Hata durumunda bile dinlemeye devam et
                     if (data.continue_listening && !interviewEnded) {
                         setTimeout(async () => {
-                            console.log('Hata sonrası ses algılama yeniden başlatılıyor...');
                             if (isAutoMode) {
                                 updateAvatarState('listening');
                                 updateStatus('Sesinizi bekliyorum...', 'auto');
@@ -1446,10 +1460,8 @@
                 console.error('Sunucu hatası:', error);
                 showError('Sunucu ile iletişim hatası: ' + error.message);
                 
-                // Hata durumunda bile dinlemeye devam et
                 if (!interviewEnded) {
                     setTimeout(async () => {
-                        console.log('Hata sonrası ses algılama yeniden başlatılıyor...');
                         if (isAutoMode) {
                             updateAvatarState('listening');
                             updateStatus('Sesinizi bekliyorum...', 'auto');
@@ -1631,6 +1643,12 @@
         }
 
         function addMessageToChat(role, message) {
+            // Mesajı geçmişe ekle
+            chatHistory.push({
+                role: role,
+                content: message
+            });
+
             // Önceki mesajları temizle
             const existingMessages = document.querySelectorAll(`.chat-bubble.${role}-bubble`);
             existingMessages.forEach(msg => {
@@ -1690,60 +1708,27 @@
 
         async function endInterview() {
             try {
-                stopTimer(); // Süre sayacını durdur
-                await stopAudioSystem();
+                interviewEnded = true;
+                updateStatus('Mülakat sonlandırılıyor...', 'processing');
                 
-                // Veda mesajı göster
-                addMessageToChat('assistant', 'Mülakat tamamlandı. Sorularımız bitti. Katılımınız için teşekkür ederiz. Şimdi rapor oluşturulacak ve tarayıcı penceresi kapandığında size iletilecektir.');
-                
-                console.log('Mülakat sonlandırma isteği gönderiliyor...');
-                const response = await fetch('/stop_recording', {
+                // Mülakat durumunu kaydet
+                await fetch('/save_interview_state', {
                     method: 'POST',
                     headers: {
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/json'
+                        'Content-Type': 'application/json'
                     },
                     body: JSON.stringify({
-                        interview_code: interviewCode
+                        code: interviewCode,
+                        conversation_history: chatHistory,
+                        ended: true
                     })
                 });
                 
-                if (!response.ok) {
-                    const errorText = await response.text();
-                    console.error('Sonlandırma yanıt detayı:', errorText);
-                    throw new Error(`HTTP error! status: ${response.status}, detail: ${errorText}`);
-                }
+                // Rapor oluştur
+                await generateReport();
                 
-                const data = await response.json();
-                console.log('Mülakat sonlandırma yanıtı:', data);
-                
-                if (data.success) {
-                    addMessageToChat('assistant', 'Mülakat tamamlandı. Rapor oluşturuluyor...');
-                    
-                    // Raporu indir
-                    if (data.report_url) {
-                        const downloadLink = document.createElement('a');
-                        downloadLink.href = data.report_url;
-                        downloadLink.download = `mulakat_raporu_${new Date().toISOString().slice(0,10)}.pdf`;
-                        downloadLink.click();
-                    }
-                    
-                    // Webhook'a gönder
-                    if (data.report_data) {
-                        await sendReportToWebhook(data.report_data);
-                    }
-                    
-                    showSuccess('Mülakat başarıyla tamamlandı ve rapor oluşturuldu!');
-                    updateStatus('Mülakat tamamlandı', 'completed');
-                    document.getElementById('aivaAvatar').classList.add('completed');
-                    
-                    // Rapor indirme butonu ekle
-                    if (data.report_url) {
-                        addDownloadButton(data.report_url);
-                    }
-                } else {
-                    throw new Error(data.error || 'Rapor oluşturulamadı');
-                }
+                updateStatus('Mülakat tamamlandı', 'completed');
+                document.getElementById('aivaAvatar').classList.add('completed');
                 
             } catch (error) {
                 console.error('Mülakat bitirme hatası:', error);
@@ -1751,35 +1736,47 @@
             }
         }
 
-        async function sendReportToWebhook(reportData) {
+        async function generateReport() {
             try {
-                // Yeni webhook URL'si
-                const webhookUrl = 'https://otomasyon.aivatech.io/api/v1/webhooks/B7iYtwVltWEzX2nvAaWCX';
+                console.log('Rapor oluşturma başlatılıyor...', chatHistory);
                 
-                console.log('Webhook\'a gönderilen veri:', reportData);
-                
-                const response = await fetch(webhookUrl, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        interview_data: reportData,
-                        timestamp: new Date().toISOString(),
-                        status: 'completed'
-                    })
-                });
-                
-                if (!response.ok) {
-                    const errorText = await response.text();
-                    throw new Error(`Webhook hatası: ${response.status}, detay: ${errorText}`);
+                // Mülakat kodunu al
+                const interviewCode = new URLSearchParams(window.location.search).get('code');
+                if (!interviewCode) {
+                    throw new Error('Mülakat kodu bulunamadı');
                 }
                 
-                console.log('Rapor webhook\'a başarıyla gönderildi');
+                // Rapor oluşturma isteği gönder
+                const response = await fetch('/generate_report', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        interview_code: interviewCode,
+                        conversation_history: chatHistory
+                    })
+                });
+
+                const data = await response.json();
+                console.log('Rapor yanıtı:', data);
+
+                if (data.success) {
+                    addMessageToChat('assistant', 'Mülakat tamamlandı. Rapor oluşturuluyor...');
+                    showSuccess('Rapor başarıyla oluşturuldu!');
+                    
+                    // Rapor URL'si varsa indirme butonu ekle
+                    if (data.pdf_path) {
+                        addDownloadButton(`/reports/${data.pdf_path.split('/').pop()}`);
+                    }
+                    return true;
+                } else {
+                    throw new Error(data.error || 'Rapor oluşturulamadı');
+                }
             } catch (error) {
-                console.error('Webhook hatası:', error);
-                showError('Rapor webhook\'a gönderilemedi: ' + error.message);
+                console.error('Rapor oluşturma hatası:', error);
+                showError('Rapor oluşturulurken bir hata oluştu: ' + error.message);
+                return false;
             }
         }
 

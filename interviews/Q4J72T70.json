@@ -1,0 +1,26 @@
+{
+  "code": "Q4J72T70",
+  "candidate_name": "Ahmet Yılmaz",
+  "position": "Senior Python Geliştirici",
+  "requirements": [
+    "5+ yıl Python deneyimi",
+    "Django/Flask framework deneyimi",
+    "Mikroservis mimarisi tecrübesi"
+  ],
+  "questions": [
+    "Python'da asenkron programlama ve asyncio kütüphanesi hakkında deneyimlerinizi paylaşır mısınız?",
+    "Mikroservis mimarisinde yaşadığınız zorluklar ve çözüm yöntemleriniz nelerdir?",
+    "Django ORM'in performans optimizasyonu için neler yapılabilir?"
+  ],
+  "created_at": "2025-02-22T22:14:16.847223",
+  "status": "active",
+  "webhook_aday_url": "https://otomasyon.aivatech.io/api/v1/webhooks/aday",
+  "webhook_rapor_url": "https://otomasyon.aivatech.io/api/v1/webhooks/rapor",
+  "conversation_history": [
+    {
+      "role": "assistant",
+      "content": "Merhaba Ahmet Yılmaz, Senior Python Geliştirici pozisyonu için mülakatımıza hoş geldiniz. Ben sizin mülakat uzmanınızım. Öncelikle kendinizi rahat hissetmenizi istiyorum, bu sadece bir sohbet. Başlamak için hazır olduğunuzda bana haber verebilirsiniz. Nasılsınız?",
+      "timestamp": "2025-02-22T22:14:53.670432"
+    }
+  ]
+}
