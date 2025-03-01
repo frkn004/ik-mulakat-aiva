@@ -41,6 +41,7 @@ import wave
 import tempfile
 from functools import wraps
 import re
+import base64
 
 # Flask ve async ayarları
 app = Flask(__name__)
@@ -1861,34 +1862,94 @@ async def end_interview():
 @app.route('/save_interview_state', methods=['POST'])
 def save_interview_state():
     try:
-        data = request.get_json()
-        if not data or 'code' not in data:
-            return jsonify({'success': False, 'error': 'Mülakat kodu gerekli'}), 400
-
-        interview_code = data['code']
+        data = request.json
+        code = data.get('code')
         conversation_history = data.get('conversation_history', [])
         ended = data.get('ended', False)
-
-        # Mülakat dosyasını güncelle
-        interview_file = os.path.join('interviews', f'{interview_code}.json')
-        if not os.path.exists(interview_file):
+        
+        if not code:
+            return jsonify({'success': False, 'error': 'Mülakat kodu gereklidir'}), 400
+            
+        # JSON dosyasını kontrol et
+        json_path = os.path.join('interviews', f'{code}.json')
+        if not os.path.exists(json_path):
             return jsonify({'success': False, 'error': 'Mülakat bulunamadı'}), 404
-
-        with open(interview_file, 'r', encoding='utf-8') as f:
+            
+        # JSON dosyasını oku
+        with open(json_path, 'r', encoding='utf-8') as f:
             interview_data = json.load(f)
-
-        # Mülakat durumunu güncelle
+            
+        # Verileri güncelle
         interview_data['conversation_history'] = conversation_history
-        interview_data['ended'] = ended
-        interview_data['last_updated'] = datetime.now().isoformat()
-
-        with open(interview_file, 'w', encoding='utf-8') as f:
+        if ended:
+            interview_data['ended'] = True
+            interview_data['status'] = 'completed'
+            interview_data['ended_at'] = datetime.now().isoformat()
+            
+        # Verileri kaydet
+        with open(json_path, 'w', encoding='utf-8') as f:
             json.dump(interview_data, f, ensure_ascii=False, indent=2)
-
+            
         return jsonify({'success': True})
-
+        
     except Exception as e:
-        logger.error(f'Mülakat durumu kaydetme hatası: {str(e)}')
+        logger.error(f"Mülakat durumu kaydetme hatası: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/save_photo', methods=['POST'])
+def save_photo():
+    try:
+        data = request.json
+        code = data.get('code')
+        photo_data = data.get('photo')
+        timestamp = data.get('timestamp')
+        
+        if not code or not photo_data:
+            return jsonify({'success': False, 'error': 'Mülakat kodu ve fotoğraf verisi gereklidir'}), 400
+            
+        # JSON dosyasını kontrol et
+        json_path = os.path.join('interviews', f'{code}.json')
+        if not os.path.exists(json_path):
+            return jsonify({'success': False, 'error': 'Mülakat bulunamadı'}), 404
+        
+        # Base64 formatındaki fotoğrafı işle
+        # Başlangıç kısmını (data:image/jpeg;base64,) kaldır
+        image_data = photo_data.split(',')[1]
+        
+        # Fotoğrafları saklamak için klasör oluştur
+        photos_dir = os.path.join('interviews', f'{code}_photos')
+        os.makedirs(photos_dir, exist_ok=True)
+        
+        # Fotoğrafa benzersiz bir ad ver
+        photo_filename = f"{datetime.now().strftime('%Y%m%d%H%M%S')}.jpg"
+        photo_path = os.path.join(photos_dir, photo_filename)
+        
+        # Fotoğrafı kaydet
+        with open(photo_path, 'wb') as f:
+            f.write(base64.b64decode(image_data))
+            
+        # JSON dosyasını güncelle (fotoğraf bilgilerini ekle)
+        with open(json_path, 'r', encoding='utf-8') as f:
+            interview_data = json.load(f)
+            
+        # Fotoğraf bilgilerini ekle
+        if 'photos' not in interview_data:
+            interview_data['photos'] = []
+            
+        interview_data['photos'].append({
+            'filename': photo_filename,
+            'timestamp': timestamp,
+            'path': os.path.join(f'{code}_photos', photo_filename)
+        })
+        
+        # Güncellenen veriyi kaydet
+        with open(json_path, 'w', encoding='utf-8') as f:
+            json.dump(interview_data, f, ensure_ascii=False, indent=2)
+            
+        return jsonify({'success': True})
+        
+    except Exception as e:
+        logger.error(f"Fotoğraf kaydetme hatası: {str(e)}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/get_speech', methods=['GET'])

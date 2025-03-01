@@ -576,6 +576,57 @@
         .timer i {
             color: #ef4444;
         }
+
+        /* Kamera ve Fotoğraf Stilleri */
+        .camera-container {
+            position: fixed;
+            top: 100px;
+            right: 20px;
+            width: 240px;
+            height: 180px;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 10px 15px rgba(0, 0, 0, 0.2);
+            z-index: 40;
+            display: none; /* Başlangıçta gizli */
+        }
+
+        #videoElement {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transform: scaleX(-1); /* Ayna görüntüsü */
+        }
+
+        .camera-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+        }
+
+        .photo-flash {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: white;
+            opacity: 0;
+            transition: opacity 0.1s;
+        }
+
+        .photo-flash.active {
+            opacity: 0.8;
+            animation: flash 0.3s ease-out;
+        }
+
+        @keyframes flash {
+            0% { opacity: 0.8; }
+            100% { opacity: 0; }
+        }
     </style>
 </head>
 <body>
@@ -663,6 +714,15 @@
         <div id="messages" class="chat-messages"></div>
     </div>
 
+    <!-- Kamera Görüntüsü -->
+    <div class="camera-container" id="cameraContainer">
+        <video id="videoElement" autoplay playsinline></video>
+        <canvas id="photoCanvas" style="display:none;"></canvas>
+        <div class="camera-overlay" id="cameraOverlay">
+            <div class="photo-flash" id="photoFlash"></div>
+        </div>
+    </div>
+
     <!-- Durum Göstergesi -->
     <div class="status-indicator">
         <div class="status-dot" id="statusDot"></div>
@@ -714,6 +774,11 @@
         let interviewStartTime = null;
         let timerInterval = null;
         let chatHistory = [];
+        let videoStream = null;
+        let cameraActive = false;
+        let photoInterval = null;
+        let lastPhotoTime = 0;
+        let photoCounter = 0;
 
         // WebSocket yerine SSE kullanımı
         async function initializeRealtimeSession() {
@@ -1321,6 +1386,15 @@
                 if (!initialized) {
                     return false;
                 }
+                
+                // Kamerayı başlat
+                try {
+                    await initCamera();
+                } catch (cameraError) {
+                    console.error('Kamera başlatılamadı:', cameraError);
+                    showError('Kamera başlatılamadı, ancak mülakat ses ile devam edecek');
+                    // Kamera olmadan devam et
+                }
 
                 // UI'ı güncelle
                 updateStatus('Mülakat başlatılıyor...', 'auto');
@@ -1707,9 +1781,18 @@
         }
 
         async function endInterview() {
+            if (interviewEnded) return;
+            
             try {
-                interviewEnded = true;
                 updateStatus('Mülakat sonlandırılıyor...', 'processing');
+                
+                // Tüm kaynakları temizle
+                if (isRecording) {
+                    await stopRecording();
+                }
+                
+                // Kamerayı kapat
+                stopCamera();
                 
                 // Mülakat durumunu kaydet
                 await fetch('/save_interview_state', {
@@ -1921,6 +2004,119 @@
             
             document.getElementById('interviewTimer').textContent = 
                 `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+        }
+
+        // Kamera işlemleri
+        async function initCamera() {
+            try {
+                if (!cameraActive) {
+                    // Kamera erişimi için izin iste
+                    videoStream = await navigator.mediaDevices.getUserMedia({ 
+                        video: { 
+                            width: { ideal: 1280 },
+                            height: { ideal: 720 },
+                            facingMode: "user" 
+                        } 
+                    });
+                    
+                    const videoElement = document.getElementById('videoElement');
+                    videoElement.srcObject = videoStream;
+                    
+                    // Kamera konteynerini göster
+                    document.getElementById('cameraContainer').style.display = 'block';
+                    cameraActive = true;
+                    
+                    // Rastgele fotoğraf çekme zamanlamasını başlat
+                    startRandomPhotoCapture();
+                }
+            } catch (error) {
+                console.error('Kamera erişim hatası:', error);
+                showError('Kamera erişimi sağlanamadı: ' + error.message);
+            }
+        }
+        
+        function startRandomPhotoCapture() {
+            // Rastgele zamanlarda fotoğraf çekme
+            photoInterval = setInterval(() => {
+                // 10-30 saniye arasında rastgele bir süre sonra fotoğraf çek
+                const randomDelay = Math.floor(Math.random() * 20000) + 10000; // 10-30 saniye arası
+                
+                // Son fotoğraftan bu yana yeterli süre geçtiyse
+                const now = Date.now();
+                if (now - lastPhotoTime > randomDelay) {
+                    capturePhoto();
+                    lastPhotoTime = now;
+                }
+            }, 5000); // 5 saniyede bir kontrol et
+        }
+        
+        function capturePhoto() {
+            if (!cameraActive) return;
+            
+            const video = document.getElementById('videoElement');
+            const canvas = document.getElementById('photoCanvas');
+            const photoFlash = document.getElementById('photoFlash');
+            
+            // Canvas boyutunu video boyutuna ayarla
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            
+            // Fotoğraf çek
+            const context = canvas.getContext('2d');
+            context.drawImage(video, 0, 0, canvas.width, canvas.height);
+            
+            // Flaş efekti
+            photoFlash.classList.add('active');
+            setTimeout(() => {
+                photoFlash.classList.remove('active');
+            }, 300);
+            
+            // Fotoğrafı base64 formatına çevir
+            const photoData = canvas.toDataURL('image/jpeg');
+            
+            // Fotoğrafı sunucuya gönder
+            sendPhotoToServer(photoData);
+            
+            photoCounter++;
+        }
+        
+        async function sendPhotoToServer(photoData) {
+            try {
+                const response = await fetch('/save_photo', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        code: interviewCode,
+                        photo: photoData,
+                        timestamp: new Date().toISOString()
+                    })
+                });
+                
+                const data = await response.json();
+                if (!data.success) {
+                    console.error('Fotoğraf kaydedilemedi:', data.error);
+                }
+            } catch (error) {
+                console.error('Fotoğraf gönderme hatası:', error);
+            }
+        }
+        
+        // Kamerayı kapat
+        function stopCamera() {
+            if (videoStream) {
+                videoStream.getTracks().forEach(track => track.stop());
+                videoStream = null;
+            }
+            
+            if (photoInterval) {
+                clearInterval(photoInterval);
+                photoInterval = null;
+            }
+            
+            document.getElementById('cameraContainer').style.display = 'none';
+            cameraActive = false;
         }
 
     </script>
