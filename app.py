@@ -42,22 +42,29 @@ import tempfile
 from functools import wraps
 import re
 import base64
+from flask_session import Session
+
+# .env dosyasını yükle
+load_dotenv()
 
 # Flask ve async ayarları
 app = Flask(__name__)
-CORS(app)
+app.config['SESSION_TYPE'] = 'filesystem'
+app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=24)
+app.config['SESSION_COOKIE_SECURE'] = False  # Development için False
+app.config['SESSION_COOKIE_HTTPONLY'] = True
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 app.config['UPLOAD_FOLDER'] = 'uploads'
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
-app.secret_key = 'aiva-secret-key-2024'  # Session için secret key
-app.permanent_session_lifetime = timedelta(days=30)  # Remember me için session süresi
-loop = asyncio.new_event_loop()
-asyncio.set_event_loop(loop)
+app.secret_key = os.getenv('SECRET_KEY', 'aiva_secret_key_2024')
+Session(app)
 
-# Logger ayarları
-logging.basicConfig(level=logging.INFO)
+# CORS ayarları
+CORS(app, supports_credentials=True)
+
+# Logging ayarları
+logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
-
-load_dotenv()
 
 # OpenAI istemcisini başlat
 openai_client = OpenAI()
@@ -641,7 +648,9 @@ def login_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
         if not session.get('logged_in'):
+            logger.debug("Oturum bulunamadı, login sayfasına yönlendiriliyor")
             return redirect(url_for('login'))
+        logger.debug(f"Oturum doğrulandı: {session.get('user_id')}")
         return f(*args, **kwargs)
     return decorated_function
 
@@ -652,15 +661,29 @@ ADMIN_PASSWORD = os.getenv('ADMIN_PASSWORD')
 # Login sayfası route'u
 @app.route('/login', methods=['GET', 'POST'])
 def login():
+    # Eğer zaten giriş yapılmışsa, direkt create_interview'a yönlendir
+    if session.get('logged_in'):
+        logger.debug("Kullanıcı zaten giriş yapmış, create_interview'a yönlendiriliyor")
+        return redirect(url_for('create_interview'))
+        
     if request.method == 'POST':
-        username = request.form.get('username')
-        password = request.form.get('password')
+        username = request.form.get('username', '').strip()
+        password = request.form.get('password', '').strip()
+        
+        logger.debug(f"Login denemesi - Kullanıcı: {username}")
+        logger.debug(f"Beklenen kullanıcı: {ADMIN_EMAIL}")
         
         # Sadece .env'den alınan bilgileri kullan
-        if username == ADMIN_EMAIL and password == ADMIN_PASSWORD:
+        if username and password and username == ADMIN_EMAIL and password == ADMIN_PASSWORD:
+            logger.debug("Login başarılı")
+            session.clear()
             session['logged_in'] = True
+            session['user_id'] = username
+            session.permanent = True
+            logger.debug("Session oluşturuldu, create_interview'a yönlendiriliyor")
             return redirect(url_for('create_interview'))
         else:
+            logger.debug(f"Login başarısız - Girilen kullanıcı: {username}")
             return render_template('login.html', error="Geçersiz kullanıcı adı veya şifre")
     
     return render_template('login.html')
@@ -732,8 +755,6 @@ def interview():
 def create_interview():
     """Yeni bir mülakat oluştur"""
     if request.method == 'GET':
-        if 'user_id' not in session:
-            return redirect(url_for('login'))
         return render_template('create_interview.html')
         
     try:
@@ -1032,34 +1053,28 @@ async def process_audio():
                 })
 
             logger.info(f"GPT yanıtı: {gpt_response}")
-
-            # Konuşma geçmişini kaydet
-            current_interview.conversation_history.append({
-                "role": "user",
-                "content": transcript
-            })
-            current_interview.conversation_history.append({
-                "role": "assistant",
-                "content": gpt_response
-            })
-
-            # Yanıtı hemen gönder
-            response_data = {
+            
+            # Mülakat bittiğinde istemciye bildir
+            interview_ended = is_interview_ended or "MÜLAKAT_BİTTİ" in gpt_response
+            
+            # Eğer mülakat bittiyse, "MÜLAKAT_BİTTİ" cümlesini yanıttan çıkar
+            if "MÜLAKAT_BİTTİ" in gpt_response:
+                gpt_response = gpt_response.replace("MÜLAKAT_BİTTİ", "").strip()
+            
+            # İstemciye yanıt gönder
+            return jsonify({
                 'success': True,
                 'transcript': transcript,
                 'response': gpt_response,
-                'interview_ended': is_interview_ended,
-                'continue_listening': True  # Her zaman dinlemeye devam et
-            }
-
-            return jsonify(response_data)
-
+                'interview_ended': interview_ended
+            })
+            
         except Exception as e:
             logger.error(f"Ses işleme hatası: {str(e)}")
             return jsonify({
                 'success': False,
                 'error': str(e),
-                'continue_listening': True  # Hata durumunda bile dinlemeye devam et
+                'continue_listening': True  # Genel hata durumunda bile dinlemeye devam et
             })
 
         finally:
@@ -1078,6 +1093,7 @@ async def process_audio():
             'error': str(e),
             'continue_listening': True  # Genel hata durumunda bile dinlemeye devam et
         })
+
 
 @app.route('/generate_report', methods=['POST'])
 async def generate_report():
@@ -1964,14 +1980,13 @@ async def get_speech():
         
         try:
             # OpenAI TTS ile sesi oluştur
-            tts_response = openai_client.audio.speech.create(
+            async with openai_client.audio.speech.with_streaming_response.create(
                 model="tts-1",
                 voice="nova",
                 input=text
-            )
-            
-            # Ses dosyasını kaydet
-            tts_response.stream_to_file(temp_filename)
+            ) as tts_response:
+                # Ses dosyasını kaydet
+                await tts_response.stream_to_file(temp_filename)
             
             # Dosyayı oku ve yanıt olarak gönder
             def generate():
