@@ -1,0 +1,15 @@
+{
+  "code": "E4C03259",
+  "candidate_name": "furkan sevinç",
+  "position": "yazılım muhendisi",
+  "questions": [
+    "1. Hangi programlama dillerine hakimsiniz ve bu dilleri kullanarak hangi projelerde yer aldınız?",
+    "2. Bir yazılım projesi üzerinde çalışırken karşılaştığınız en büyük problem neydi ve bu problemi nasıl çözdünüz?",
+    "3. RESTful API'ler hakkında ne biliyorsunuz ve daha önce ne tür projelerde kullandınız?",
+    "4. Bir veritabanı tasarlarken nasıl bir yol izlersiniz ve hangi veritabanı yönetim sistemleriyle deneyiminiz var?",
+    "5. Yazılım testlerini nasıl yazıyor ve yönetiyorsunuz? Hangi durumların test edilmesini öncelikli görüyorsunuz?"
+  ],
+  "status": "in_progress",
+  "created_at": "2025-02-03T20:39:17.124934",
+  "updated_at": "2025-02-05T22:17:30.383928"
+}

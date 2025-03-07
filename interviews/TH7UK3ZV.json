@@ -1,0 +1,23 @@
+{
+  "code": "TH7UK3ZV",
+  "candidate_name": "Furkan Sevinç",
+  "position": "Senior Python Geliştirici",
+  "requirements": [
+    "5+ yıl Python deneyimi",
+    "Django/Flask framework deneyimi",
+    "REST API geliştirme tecrübesi",
+    "PostgreSQL veya MySQL deneyimi",
+    "Docker ve Kubernetes bilgisi"
+  ],
+  "questions": [
+    "Python'da asenkron programlama nasıl yapılır?",
+    "Django ORM'in avantajları nelerdir?"
+  ],
+  "created_at": "2025-02-22T23:43:23.231374",
+  "status": "pending",
+  "webhook_aday_url": "https://otomasyon.aivatech.io/api/v1/webhooks/aday-yanit",
+  "webhook_rapor_url": "https://otomasyon.aivatech.io/api/v1/webhooks/mulakat-rapor",
+  "conversation_history": [],
+  "ended": true,
+  "last_updated": "2025-02-23T01:15:58.277060"
+}

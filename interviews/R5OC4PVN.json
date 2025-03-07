@@ -1,0 +1,528 @@
+{
+  "code": "R5OC4PVN",
+  "candidate_name": "FURKAN SEVİNÇ",
+  "position": "YAPAY ZEKA MÜHENDİSİ",
+  "requirements": [],
+  "questions": [
+    "- \"Merhaba Furkan Bey, hoş geldiniz. Biraz kendinizi tanıtır mısınız ve bu zamana kadar hangi projeler üzerinde çalıştığınızı bizimle paylaşır mısınız?\"",
+    "- \"Yapay Zeka Mühendisi pozisyonuna başvurmanızın sebebi nedir? Bu pozisyonla ilgili sizi en çok ne heyecanlandırıyor?\"",
+    "- \"Farklı bir perspektiften yaklaştığınız ve sonunda başarılı olan bir proje veya problem üzerinde çalıştınız mı? Bu durumda ne tür bir yaklaşım sergilediniz ve sonuç ne oldu?\"",
+    "- \"Python ve TensorFlow gibi yapay zeka geliştirme araçları hakkında ne kadar tecrübeniz var? Bu araçları kullanırken hangi zorluklarla karşılaştınız ve nasıl aştınız?\"",
+    "- \"Takım içinde çalışırken iletişimi nasıl sağladığınızı ve bir problemle karşılaştığınızda takımınıza nasıl liderlik ettiğinizi anlatabilir misiniz?\""
+  ],
+  "created_at": "2025-03-03T11:54:41.759622",
+  "status": "active",
+  "started_at": "2025-03-03T11:54:59.365203",
+  "photos": [
+    {
+      "filename": "20250303124435.jpg",
+      "timestamp": "2025-03-03T09:44:35.367Z",
+      "path": "R5OC4PVN_photos/20250303124435.jpg"
+    },
+    {
+      "filename": "20250303124450.jpg",
+      "timestamp": "2025-03-03T09:44:50.366Z",
+      "path": "R5OC4PVN_photos/20250303124450.jpg"
+    },
+    {
+      "filename": "20250303124535.jpg",
+      "timestamp": "2025-03-03T09:45:35.882Z",
+      "path": "R5OC4PVN_photos/20250303124535.jpg"
+    },
+    {
+      "filename": "20250303124550.jpg",
+      "timestamp": "2025-03-03T09:45:50.879Z",
+      "path": "R5OC4PVN_photos/20250303124550.jpg"
+    },
+    {
+      "filename": "20250303124620.jpg",
+      "timestamp": "2025-03-03T09:46:20.882Z",
+      "path": "R5OC4PVN_photos/20250303124620.jpg"
+    },
+    {
+      "filename": "20250303124650.jpg",
+      "timestamp": "2025-03-03T09:46:50.881Z",
+      "path": "R5OC4PVN_photos/20250303124650.jpg"
+    },
+    {
+      "filename": "20250303124720.jpg",
+      "timestamp": "2025-03-03T09:47:20.883Z",
+      "path": "R5OC4PVN_photos/20250303124720.jpg"
+    },
+    {
+      "filename": "20250303124735.jpg",
+      "timestamp": "2025-03-03T09:47:35.881Z",
+      "path": "R5OC4PVN_photos/20250303124735.jpg"
+    },
+    {
+      "filename": "20250303124800.jpg",
+      "timestamp": "2025-03-03T09:48:00.883Z",
+      "path": "R5OC4PVN_photos/20250303124800.jpg"
+    },
+    {
+      "filename": "20250303124830.jpg",
+      "timestamp": "2025-03-03T09:48:30.878Z",
+      "path": "R5OC4PVN_photos/20250303124830.jpg"
+    },
+    {
+      "filename": "20250303124850.jpg",
+      "timestamp": "2025-03-03T09:48:50.878Z",
+      "path": "R5OC4PVN_photos/20250303124850.jpg"
+    },
+    {
+      "filename": "20250303124905.jpg",
+      "timestamp": "2025-03-03T09:49:05.880Z",
+      "path": "R5OC4PVN_photos/20250303124905.jpg"
+    },
+    {
+      "filename": "20250303124925.jpg",
+      "timestamp": "2025-03-03T09:49:25.874Z",
+      "path": "R5OC4PVN_photos/20250303124925.jpg"
+    },
+    {
+      "filename": "20250303124945.jpg",
+      "timestamp": "2025-03-03T09:49:45.880Z",
+      "path": "R5OC4PVN_photos/20250303124945.jpg"
+    },
+    {
+      "filename": "20250303125005.jpg",
+      "timestamp": "2025-03-03T09:50:05.877Z",
+      "path": "R5OC4PVN_photos/20250303125005.jpg"
+    },
+    {
+      "filename": "20250303125020.jpg",
+      "timestamp": "2025-03-03T09:50:20.882Z",
+      "path": "R5OC4PVN_photos/20250303125020.jpg"
+    },
+    {
+      "filename": "20250303125045.jpg",
+      "timestamp": "2025-03-03T09:50:45.877Z",
+      "path": "R5OC4PVN_photos/20250303125045.jpg"
+    },
+    {
+      "filename": "20250303125105.jpg",
+      "timestamp": "2025-03-03T09:51:05.875Z",
+      "path": "R5OC4PVN_photos/20250303125105.jpg"
+    },
+    {
+      "filename": "20250303125130.jpg",
+      "timestamp": "2025-03-03T09:51:30.884Z",
+      "path": "R5OC4PVN_photos/20250303125130.jpg"
+    },
+    {
+      "filename": "20250303125150.jpg",
+      "timestamp": "2025-03-03T09:51:50.880Z",
+      "path": "R5OC4PVN_photos/20250303125150.jpg"
+    },
+    {
+      "filename": "20250303125215.jpg",
+      "timestamp": "2025-03-03T09:52:15.882Z",
+      "path": "R5OC4PVN_photos/20250303125215.jpg"
+    },
+    {
+      "filename": "20250303125230.jpg",
+      "timestamp": "2025-03-03T09:52:30.874Z",
+      "path": "R5OC4PVN_photos/20250303125230.jpg"
+    },
+    {
+      "filename": "20250303125255.jpg",
+      "timestamp": "2025-03-03T09:52:55.883Z",
+      "path": "R5OC4PVN_photos/20250303125255.jpg"
+    },
+    {
+      "filename": "20250303125315.jpg",
+      "timestamp": "2025-03-03T09:53:15.882Z",
+      "path": "R5OC4PVN_photos/20250303125315.jpg"
+    },
+    {
+      "filename": "20250303125340.jpg",
+      "timestamp": "2025-03-03T09:53:40.883Z",
+      "path": "R5OC4PVN_photos/20250303125340.jpg"
+    },
+    {
+      "filename": "20250303125400.jpg",
+      "timestamp": "2025-03-03T09:54:00.880Z",
+      "path": "R5OC4PVN_photos/20250303125400.jpg"
+    },
+    {
+      "filename": "20250303125415.jpg",
+      "timestamp": "2025-03-03T09:54:15.882Z",
+      "path": "R5OC4PVN_photos/20250303125415.jpg"
+    },
+    {
+      "filename": "20250303125435.jpg",
+      "timestamp": "2025-03-03T09:54:35.882Z",
+      "path": "R5OC4PVN_photos/20250303125435.jpg"
+    },
+    {
+      "filename": "20250303125450.jpg",
+      "timestamp": "2025-03-03T09:54:50.880Z",
+      "path": "R5OC4PVN_photos/20250303125450.jpg"
+    },
+    {
+      "filename": "20250303125505.jpg",
+      "timestamp": "2025-03-03T09:55:05.877Z",
+      "path": "R5OC4PVN_photos/20250303125505.jpg"
+    },
+    {
+      "filename": "20250303125520.jpg",
+      "timestamp": "2025-03-03T09:55:20.880Z",
+      "path": "R5OC4PVN_photos/20250303125520.jpg"
+    },
+    {
+      "filename": "20250303125540.jpg",
+      "timestamp": "2025-03-03T09:55:40.878Z",
+      "path": "R5OC4PVN_photos/20250303125540.jpg"
+    },
+    {
+      "filename": "20250303125600.jpg",
+      "timestamp": "2025-03-03T09:56:00.880Z",
+      "path": "R5OC4PVN_photos/20250303125600.jpg"
+    },
+    {
+      "filename": "20250303125625.jpg",
+      "timestamp": "2025-03-03T09:56:25.883Z",
+      "path": "R5OC4PVN_photos/20250303125625.jpg"
+    },
+    {
+      "filename": "20250303125650.jpg",
+      "timestamp": "2025-03-03T09:56:50.847Z",
+      "path": "R5OC4PVN_photos/20250303125650.jpg"
+    },
+    {
+      "filename": "20250303125705.jpg",
+      "timestamp": "2025-03-03T09:57:05.842Z",
+      "path": "R5OC4PVN_photos/20250303125705.jpg"
+    },
+    {
+      "filename": "20250303125725.jpg",
+      "timestamp": "2025-03-03T09:57:25.835Z",
+      "path": "R5OC4PVN_photos/20250303125725.jpg"
+    },
+    {
+      "filename": "20250303125745.jpg",
+      "timestamp": "2025-03-03T09:57:45.836Z",
+      "path": "R5OC4PVN_photos/20250303125745.jpg"
+    },
+    {
+      "filename": "20250303125805.jpg",
+      "timestamp": "2025-03-03T09:58:05.840Z",
+      "path": "R5OC4PVN_photos/20250303125805.jpg"
+    },
+    {
+      "filename": "20250303125830.jpg",
+      "timestamp": "2025-03-03T09:58:30.825Z",
+      "path": "R5OC4PVN_photos/20250303125830.jpg"
+    },
+    {
+      "filename": "20250303125850.jpg",
+      "timestamp": "2025-03-03T09:58:50.820Z",
+      "path": "R5OC4PVN_photos/20250303125850.jpg"
+    },
+    {
+      "filename": "20250303131403.jpg",
+      "timestamp": "2025-03-03T10:14:03.694Z",
+      "path": "R5OC4PVN_photos/20250303131403.jpg"
+    },
+    {
+      "filename": "20250303133049.jpg",
+      "timestamp": "2025-03-03T10:30:49.937Z",
+      "path": "R5OC4PVN_photos/20250303133049.jpg"
+    },
+    {
+      "filename": "20250303133236.jpg",
+      "timestamp": "2025-03-03T10:32:36.054Z",
+      "path": "R5OC4PVN_photos/20250303133236.jpg"
+    },
+    {
+      "filename": "20250303134756.jpg",
+      "timestamp": "2025-03-03T10:47:56.761Z",
+      "path": "R5OC4PVN_photos/20250303134756.jpg"
+    },
+    {
+      "filename": "20250303140113.jpg",
+      "timestamp": "2025-03-03T11:01:13.682Z",
+      "path": "R5OC4PVN_photos/20250303140113.jpg"
+    },
+    {
+      "filename": "20250303140133.jpg",
+      "timestamp": "2025-03-03T11:01:33.689Z",
+      "path": "R5OC4PVN_photos/20250303140133.jpg"
+    },
+    {
+      "filename": "20250303140153.jpg",
+      "timestamp": "2025-03-03T11:01:53.692Z",
+      "path": "R5OC4PVN_photos/20250303140153.jpg"
+    },
+    {
+      "filename": "20250303140223.jpg",
+      "timestamp": "2025-03-03T11:02:23.693Z",
+      "path": "R5OC4PVN_photos/20250303140223.jpg"
+    },
+    {
+      "filename": "20250303140238.jpg",
+      "timestamp": "2025-03-03T11:02:38.691Z",
+      "path": "R5OC4PVN_photos/20250303140238.jpg"
+    },
+    {
+      "filename": "20250303140303.jpg",
+      "timestamp": "2025-03-03T11:03:03.689Z",
+      "path": "R5OC4PVN_photos/20250303140303.jpg"
+    },
+    {
+      "filename": "20250303140318.jpg",
+      "timestamp": "2025-03-03T11:03:18.697Z",
+      "path": "R5OC4PVN_photos/20250303140318.jpg"
+    },
+    {
+      "filename": "20250303140338.jpg",
+      "timestamp": "2025-03-03T11:03:38.830Z",
+      "path": "R5OC4PVN_photos/20250303140338.jpg"
+    },
+    {
+      "filename": "20250303140358.jpg",
+      "timestamp": "2025-03-03T11:03:58.838Z",
+      "path": "R5OC4PVN_photos/20250303140358.jpg"
+    },
+    {
+      "filename": "20250303140423.jpg",
+      "timestamp": "2025-03-03T11:04:23.833Z",
+      "path": "R5OC4PVN_photos/20250303140423.jpg"
+    },
+    {
+      "filename": "20250303140438.jpg",
+      "timestamp": "2025-03-03T11:04:38.825Z",
+      "path": "R5OC4PVN_photos/20250303140438.jpg"
+    },
+    {
+      "filename": "20250303140503.jpg",
+      "timestamp": "2025-03-03T11:05:03.830Z",
+      "path": "R5OC4PVN_photos/20250303140503.jpg"
+    },
+    {
+      "filename": "20250303140518.jpg",
+      "timestamp": "2025-03-03T11:05:18.833Z",
+      "path": "R5OC4PVN_photos/20250303140518.jpg"
+    },
+    {
+      "filename": "20250303140538.jpg",
+      "timestamp": "2025-03-03T11:05:38.831Z",
+      "path": "R5OC4PVN_photos/20250303140538.jpg"
+    },
+    {
+      "filename": "20250303140603.jpg",
+      "timestamp": "2025-03-03T11:06:03.830Z",
+      "path": "R5OC4PVN_photos/20250303140603.jpg"
+    },
+    {
+      "filename": "20250303140623.jpg",
+      "timestamp": "2025-03-03T11:06:23.831Z",
+      "path": "R5OC4PVN_photos/20250303140623.jpg"
+    },
+    {
+      "filename": "20250303140648.jpg",
+      "timestamp": "2025-03-03T11:06:48.829Z",
+      "path": "R5OC4PVN_photos/20250303140648.jpg"
+    },
+    {
+      "filename": "20250303140708.jpg",
+      "timestamp": "2025-03-03T11:07:08.822Z",
+      "path": "R5OC4PVN_photos/20250303140708.jpg"
+    },
+    {
+      "filename": "20250303140728.jpg",
+      "timestamp": "2025-03-03T11:07:28.831Z",
+      "path": "R5OC4PVN_photos/20250303140728.jpg"
+    },
+    {
+      "filename": "20250303140743.jpg",
+      "timestamp": "2025-03-03T11:07:43.825Z",
+      "path": "R5OC4PVN_photos/20250303140743.jpg"
+    },
+    {
+      "filename": "20250303140758.jpg",
+      "timestamp": "2025-03-03T11:07:58.829Z",
+      "path": "R5OC4PVN_photos/20250303140758.jpg"
+    },
+    {
+      "filename": "20250303140818.jpg",
+      "timestamp": "2025-03-03T11:08:18.826Z",
+      "path": "R5OC4PVN_photos/20250303140818.jpg"
+    },
+    {
+      "filename": "20250303140838.jpg",
+      "timestamp": "2025-03-03T11:08:38.827Z",
+      "path": "R5OC4PVN_photos/20250303140838.jpg"
+    },
+    {
+      "filename": "20250303140858.jpg",
+      "timestamp": "2025-03-03T11:08:58.821Z",
+      "path": "R5OC4PVN_photos/20250303140858.jpg"
+    },
+    {
+      "filename": "20250303140913.jpg",
+      "timestamp": "2025-03-03T11:09:13.820Z",
+      "path": "R5OC4PVN_photos/20250303140913.jpg"
+    },
+    {
+      "filename": "20250303140943.jpg",
+      "timestamp": "2025-03-03T11:09:43.832Z",
+      "path": "R5OC4PVN_photos/20250303140943.jpg"
+    },
+    {
+      "filename": "20250303141003.jpg",
+      "timestamp": "2025-03-03T11:10:03.835Z",
+      "path": "R5OC4PVN_photos/20250303141003.jpg"
+    },
+    {
+      "filename": "20250303141028.jpg",
+      "timestamp": "2025-03-03T11:10:28.830Z",
+      "path": "R5OC4PVN_photos/20250303141028.jpg"
+    },
+    {
+      "filename": "20250303141048.jpg",
+      "timestamp": "2025-03-03T11:10:48.827Z",
+      "path": "R5OC4PVN_photos/20250303141048.jpg"
+    },
+    {
+      "filename": "20250303141108.jpg",
+      "timestamp": "2025-03-03T11:11:08.825Z",
+      "path": "R5OC4PVN_photos/20250303141108.jpg"
+    },
+    {
+      "filename": "20250303141133.jpg",
+      "timestamp": "2025-03-03T11:11:33.826Z",
+      "path": "R5OC4PVN_photos/20250303141133.jpg"
+    },
+    {
+      "filename": "20250303141153.jpg",
+      "timestamp": "2025-03-03T11:11:53.823Z",
+      "path": "R5OC4PVN_photos/20250303141153.jpg"
+    },
+    {
+      "filename": "20250303141218.jpg",
+      "timestamp": "2025-03-03T11:12:18.814Z",
+      "path": "R5OC4PVN_photos/20250303141218.jpg"
+    },
+    {
+      "filename": "20250303141233.jpg",
+      "timestamp": "2025-03-03T11:12:33.825Z",
+      "path": "R5OC4PVN_photos/20250303141233.jpg"
+    },
+    {
+      "filename": "20250303141253.jpg",
+      "timestamp": "2025-03-03T11:12:53.822Z",
+      "path": "R5OC4PVN_photos/20250303141253.jpg"
+    },
+    {
+      "filename": "20250303141308.jpg",
+      "timestamp": "2025-03-03T11:13:08.816Z",
+      "path": "R5OC4PVN_photos/20250303141308.jpg"
+    },
+    {
+      "filename": "20250303141333.jpg",
+      "timestamp": "2025-03-03T11:13:33.825Z",
+      "path": "R5OC4PVN_photos/20250303141333.jpg"
+    },
+    {
+      "filename": "20250303141358.jpg",
+      "timestamp": "2025-03-03T11:13:58.826Z",
+      "path": "R5OC4PVN_photos/20250303141358.jpg"
+    },
+    {
+      "filename": "20250303141423.jpg",
+      "timestamp": "2025-03-03T11:14:23.824Z",
+      "path": "R5OC4PVN_photos/20250303141423.jpg"
+    },
+    {
+      "filename": "20250303141448.jpg",
+      "timestamp": "2025-03-03T11:14:48.822Z",
+      "path": "R5OC4PVN_photos/20250303141448.jpg"
+    },
+    {
+      "filename": "20250303141503.jpg",
+      "timestamp": "2025-03-03T11:15:03.813Z",
+      "path": "R5OC4PVN_photos/20250303141503.jpg"
+    },
+    {
+      "filename": "20250303141528.jpg",
+      "timestamp": "2025-03-03T11:15:28.823Z",
+      "path": "R5OC4PVN_photos/20250303141528.jpg"
+    },
+    {
+      "filename": "20250303141548.jpg",
+      "timestamp": "2025-03-03T11:15:48.822Z",
+      "path": "R5OC4PVN_photos/20250303141548.jpg"
+    },
+    {
+      "filename": "20250303141603.jpg",
+      "timestamp": "2025-03-03T11:16:03.826Z",
+      "path": "R5OC4PVN_photos/20250303141603.jpg"
+    },
+    {
+      "filename": "20250303141628.jpg",
+      "timestamp": "2025-03-03T11:16:28.823Z",
+      "path": "R5OC4PVN_photos/20250303141628.jpg"
+    },
+    {
+      "filename": "20250303141648.jpg",
+      "timestamp": "2025-03-03T11:16:48.823Z",
+      "path": "R5OC4PVN_photos/20250303141648.jpg"
+    },
+    {
+      "filename": "20250303141718.jpg",
+      "timestamp": "2025-03-03T11:17:18.820Z",
+      "path": "R5OC4PVN_photos/20250303141718.jpg"
+    },
+    {
+      "filename": "20250303141738.jpg",
+      "timestamp": "2025-03-03T11:17:38.821Z",
+      "path": "R5OC4PVN_photos/20250303141738.jpg"
+    },
+    {
+      "filename": "20250303141808.jpg",
+      "timestamp": "2025-03-03T11:18:08.819Z",
+      "path": "R5OC4PVN_photos/20250303141808.jpg"
+    },
+    {
+      "filename": "20250303141823.jpg",
+      "timestamp": "2025-03-03T11:18:23.824Z",
+      "path": "R5OC4PVN_photos/20250303141823.jpg"
+    },
+    {
+      "filename": "20250303141838.jpg",
+      "timestamp": "2025-03-03T11:18:38.822Z",
+      "path": "R5OC4PVN_photos/20250303141838.jpg"
+    },
+    {
+      "filename": "20250303141903.jpg",
+      "timestamp": "2025-03-03T11:19:03.818Z",
+      "path": "R5OC4PVN_photos/20250303141903.jpg"
+    },
+    {
+      "filename": "20250303141928.jpg",
+      "timestamp": "2025-03-03T11:19:28.823Z",
+      "path": "R5OC4PVN_photos/20250303141928.jpg"
+    },
+    {
+      "filename": "20250303141948.jpg",
+      "timestamp": "2025-03-03T11:19:48.824Z",
+      "path": "R5OC4PVN_photos/20250303141948.jpg"
+    },
+    {
+      "filename": "20250303142018.jpg",
+      "timestamp": "2025-03-03T11:20:18.825Z",
+      "path": "R5OC4PVN_photos/20250303142018.jpg"
+    },
+    {
+      "filename": "20250303142043.jpg",
+      "timestamp": "2025-03-03T11:20:43.823Z",
+      "path": "R5OC4PVN_photos/20250303142043.jpg"
+    },
+    {
+      "filename": "20250303142058.jpg",
+      "timestamp": "2025-03-03T11:20:58.817Z",
+      "path": "R5OC4PVN_photos/20250303142058.jpg"
+    }
+  ]
+}

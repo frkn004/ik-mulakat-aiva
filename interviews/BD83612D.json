@@ -1,0 +1,15 @@
+{
+  "code": "BD83612D",
+  "candidate_name": "nisa duru",
+  "position": "yapay zeka uzamanı",
+  "questions": [
+    "1. Yapay zeka projelerinde hangi dilleri ve araçları kullanıyorsunuz? Özellikle hangi dil veya aracı kullanarak varolan bir sorunu çözdüğünüz bir örnek verebilir misiniz?",
+    "2. Veri temizleme sürecinde karşılaştığınız en karmaşık sorun ne oldu ve bu sorunu nasıl çözdünüz?",
+    "3. Yapay zekayla ilgili en son ne öğrendiniz ve bu bilgiyi nasıl uyguladınız?",
+    "4. Hangi derin öğrenme çerçevelerini kulandınız ve bu çerçevelerin hangi özelliklerinin size yardımcı olduğunu açıklabilir misiniz?",
+    "5. Bir yapay zeka projesini başarıyla tamamlamak için önemli olduğunu düşündüğünüz 3 özellik nelerdir ve bunları bir örnek üzerinden açıklayabilir misiniz?"
+  ],
+  "status": "in_progress",
+  "created_at": "2025-02-03T20:28:16.919314",
+  "updated_at": "2025-02-03T20:28:22.433675"
+}

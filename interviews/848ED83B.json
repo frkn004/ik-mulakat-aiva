@@ -1,0 +1,14 @@
+{
+  "code": "848ED83B",
+  "candidate_name": "nisa duru",
+  "position": "yapay zeka uzamanı",
+  "questions": [
+    "1. Yapay zeka projelerinizde hangi programlama dillerini kullandınız ve bu dilleri nasıl etkin bir şekilde kullanıyorsunuz?",
+    "2. Önceki deneyimlerinizde bir yapay zeka modelini eğitmek için hangi algoritmaları kullandınız ve bu algoritmalar hakkında ne gibi anlayışlara sahipsiniz?",
+    "3. Yapay zeka projesinde karşılaştığınız en büyük zorluğu ve bu zorluğu nasıl çözdüğünüzü paylaşabilir misiniz?",
+    "4. Makine öğrenmesi ve derin öğrenme arasındaki farklar hakkında neler biliyorsunuz? Projelerinizde hangi teknikleri kullandınız?",
+    "5. Yapay zeka modellerinin etkinliğini ve doğruluğunu değerlendirmek için hangi metrikleri kullanıyorsunuz?"
+  ],
+  "status": "pending",
+  "created_at": "2025-02-03T20:25:20.135058"
+}

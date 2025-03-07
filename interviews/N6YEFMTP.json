@@ -1,0 +1,31 @@
+{
+  "code": "N6YEFMTP",
+  "candidate_name": "FURKAN SEVİNÇ",
+  "position": "CEO",
+  "requirements": [],
+  "questions": [
+    "- Merhaba Furkan Bey, hoş geldiniz. Öncelikle bize kariyer yolculuğunuzdan biraz bahseder misiniz? Neden CEO pozisyonunda olmayı tercih ettiniz ve bu konuda ne gibi deneyimler elde ettiniz?",
+    "- CEO olarak hangi teknik bilgilerin önemli olduğunu düşünüyorsunuz ve bu konuda ne tür bir bilgi birikimine sahipsiniz?",
+    "- Problem çözme süreçlerinizden biraz bahsedebilir misiniz? Özellikle zorlu bir durumla karşılaştığınızda ne tür stratejiler uyguluyorsunuz?",
+    "- Bir takımı yönetirken karşılaştığınız en büyük zorluklar nelerdir ve bu zorlukları nasıl aşıyorsunuz? Ayrıca, çalışanlarınızla nasıl bir iletişim kurmayı tercih ediyorsunuz?",
+    "- Son olarak, bu pozisyona başvurmanızın arkasındaki motivasyonunuz nedir? İçinde bulunduğumuz şirketin yolculuğuna nereden katkı sağlamayı hedefliyorsunuz?"
+  ],
+  "created_at": "2025-03-01T22:09:56.288619",
+  "status": "completed",
+  "started_at": "2025-03-01T22:10:00.582669",
+  "photos": [
+    {
+      "filename": "20250301221016.jpg",
+      "timestamp": "2025-03-01T19:10:16.855Z",
+      "path": "N6YEFMTP_photos/20250301221016.jpg"
+    }
+  ],
+  "conversation_history": [
+    {
+      "role": "assistant",
+      "content": "Merhaba, mülakata başlamak için hazır olduğunuzda 'Başlayalım' diyebilirsiniz."
+    }
+  ],
+  "ended": true,
+  "ended_at": "2025-03-01T22:10:24.128535"
+}

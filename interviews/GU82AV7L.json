@@ -1,0 +1,72 @@
+{
+  "code": "GU82AV7L",
+  "candidate_name": "Ahmet Yılmaz",
+  "email": "ahmet@email.com",
+  "position": "Senior Python Developer",
+  "requirements": [
+    "Python",
+    "Flask",
+    "REST API",
+    "PostgreSQL"
+  ],
+  "questions": [
+    "Python ile nesne yönelimli programlama deneyiminizi anlatır mısınız?",
+    "REST API tasarımında dikkat ettiğiniz önemli noktalar nelerdir?",
+    "Büyük ölçekli projelerde karşılaştığınız zorlukları nasıl çözdünüz?"
+  ],
+  "cv_summary": "5 yıllık Python geliştirici deneyimi. Flask ve Django ile büyük ölçekli projeler geliştirmiş. Mikroservis mimarisi konusunda deneyimli.",
+  "pre_info": "Teknik yetkinliği güçlü görünüyor. İletişim becerileri geliştirilmeli.",
+  "created_at": "2025-02-08T18:54:50.114627",
+  "status": "pending",
+  "conversation_history": [
+    {
+      "role": "user",
+      "content": "Selam"
+    },
+    {
+      "role": "assistant",
+      "content": "Merhaba Ahmet Bey, bugün sizinle tanışmak çok güzel. Nasılsınız? Mülakatımıza başlamadan önce sizinle biraz sohbet etmek isterim. Python ile nesne yönelimli programlama deneyiminizi anlatır mısınız?"
+    },
+    {
+      "role": "user",
+      "content": "Nesneye yönelik programlama daha çok aldığımız yaklaşma yapmak istediğimiz şeye göre yaptırırız. Ben önce engelliyorum hazırla."
+    },
+    {
+      "role": "assistant",
+      "content": "Affedersiniz, tam anlayamadım. Python ile nesne yönelimli programlama konusundaki deneyimlerinizi biraz daha detaylı anlatabilir misiniz? Özellikle bir projede nasıl uyguladığınızdan örnekler verir misiniz?"
+    },
+    {
+      "role": "user",
+      "content": "Nesneye yönelik programlama Hayır daha çok yapmak istediğim ürüne göre yapıyorum."
+    },
+    {
+      "role": "assistant",
+      "content": "Anladım, yani nesne yönelimli programlamayı projenin gereksinimlerine göre uyguladığınızı söylüyorsunuz. Bu yaklaşımınızı biraz daha detaylandırabilir misiniz? Bir projede nesne yönelimli programlama prensiplerini nasıl kullandığınıza dair bir örnek verebilir misiniz?"
+    },
+    {
+      "role": "user",
+      "content": "Mesela bir ses dinleme projesi yapıyorum. Direkt amacım sesi dinlemek olduğu için model Üzerinde çalışıyorum."
+    },
+    {
+      "role": "assistant",
+      "content": "Anladım, ses dinleme projesinde nesne yönelimli programlama prensiplerini model üzerinde çalışarak uyguladığınızı söylüyorsunuz. Özel bir ses modeli üzerinde çalıştığınızı düşünürsek, bu gerçekten ilginç bir yaklaşım. \n\nŞimdi bir sonraki soruma geçmek istiyorum: REST API tasarımında dikkat ettiğiniz önemli noktalar nelerdir?"
+    },
+    {
+      "role": "user",
+      "content": "Açıkçası çok bir fikrim yok."
+    },
+    {
+      "role": "assistant",
+      "content": "Anladım Ahmet Bey, bu konuda belki de daha fazla tecrübe kazanmanız gerekiyor. REST API tasarımı ve uygulaması, özellikle web geliştirme ve çeşitli platformlar arasında veri paylaşımı konusunda önemli bir rol oynar. Ancak, endişelenmeyin, bu konuyu zamanla daha da iyi anlayacaksınız.\n\nŞimdi bir sonraki sorumuza geçelim: Büyük ölçekli projelerde karşılaştığınız zorlukları nasıl çözdünüz"
+    },
+    {
+      "role": "user",
+      "content": "Projelerde kaşar karşılaştın dolu karı kız araştırmaları yaparak Yardım alarak ve benden büyük deneyimli kişilere sorarak çözdüm."
+    },
+    {
+      "role": "assistant",
+      "content": "Anladım, yani sorunları çözerken araştırmalar yapmayı, yardım almayı ve deneyimli kişilere danışmayı tercih ettiğinizi söylüyorsunuz. Bu, karmaşık ve büyük ölçekli projelerle başa çıkmanın iyi bir yolu olabilir. Kendi yeteneklerimizin yanı sıra, başkalarından öğrenebileceğimiz çok şey var. Bu yaklaşımınızın, problem çözme becerilerinizi ve takım içinde çalışma yeteneğinizi"
+    }
+  ],
+  "current_question_index": 4
+}

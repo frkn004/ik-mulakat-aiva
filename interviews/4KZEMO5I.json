@@ -1,0 +1,57 @@
+{
+  "code": "4KZEMO5I",
+  "candidate_name": "süleyman kaplans",
+  "position": "yazılıumcı",
+  "requirements": [],
+  "questions": [
+    "1. Genel deneyiminizi ve geçmiş yazılım projelerinizi kısaca özetleyebilir misiniz?",
+    "2. Bu pozisyonu neden tercih ettiniz ve bu rolde ne tür beklentileriniz var?",
+    "3. En iyi olduğunuz programlama dili ve bu dilde geliştirdiğiniz bir proje hakkında bize biraz bilgi verebilir misiniz?",
+    "4. Yazılım geliştirmede karşılaştığınız en büyük zorluk neydi ve bu zorluğu nasıl aştınız?"
+  ],
+  "created_at": "2025-02-16T23:06:18.805902",
+  "status": "active",
+  "conversation_history": [
+    {
+      "role": "user",
+      "content": "Selam nasılsın, iyi misin?"
+    },
+    {
+      "role": "assistant",
+      "content": "Merhaba Süleyman Bey, ben de iyiyim, teşekkür ederim. Sizinle tanışmak çok güzel. Mülakatımıza başlamaya hazır mısınız?"
+    },
+    {
+      "role": "user",
+      "content": "Selam nasılsın, iyi misin?"
+    },
+    {
+      "role": "assistant",
+      "content": "Merhaba Süleyman Bey, ben de iyiyim, teşekkür ederim. Sizinle tanışmak çok güzel. Mülakatımıza başlamaya hazır mısınız?"
+    },
+    {
+      "role": "user",
+      "content": "Selam nasılsın, iyi misin?"
+    },
+    {
+      "role": "assistant",
+      "content": "Merhaba Süleyman Bey, ben de iyiyim, teşekkür ederim. Sizinle tanışmak çok güzel. Mülakatımıza başlamaya hazır mısınız?"
+    },
+    {
+      "role": "user",
+      "content": "Selam nasılsın, iyi misin?"
+    },
+    {
+      "role": "assistant",
+      "content": "Merhaba Süleyman Bey, ben de iyiyim, teşekkür ederim. Sizinle tanışmak çok güzel. Mülakatımıza başlamaya hazır mısınız?"
+    },
+    {
+      "role": "user",
+      "content": "Selam"
+    },
+    {
+      "role": "assistant",
+      "content": "Merhaba Süleyman Bey, bugün sizinle tanışmak çok güzel. Nasılsınız? Hazır olduğunuzda mülakatımıza başlayabiliriz."
+    }
+  ],
+  "current_question_index": 5
+}
