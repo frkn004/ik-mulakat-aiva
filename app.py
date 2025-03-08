@@ -47,6 +47,9 @@ from flask_session import Session
 # .env dosyasını yükle
 load_dotenv()
 
+# Logging seviyesini ayarla - DEBUG yerine INFO kullan
+logging.basicConfig(level=logging.INFO)
+
 # Flask ve async ayarları
 app = Flask(__name__)
 app.config['SESSION_TYPE'] = 'filesystem'
@@ -63,7 +66,6 @@ Session(app)
 CORS(app, supports_credentials=True)
 
 # Logging ayarları
-logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 # OpenAI istemcisini başlat
