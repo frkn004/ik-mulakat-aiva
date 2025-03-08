@@ -1265,7 +1265,7 @@ async def generate_report():
 def extract_score(text, category):
     """Metinden puan çıkarma"""
     try:
-        pattern = f"{category}.*?(\d+)"
+        pattern = f"{category}.*?(\\d+)"
         match = re.search(pattern, text, re.DOTALL)
         if match:
             score = int(match.group(1))
