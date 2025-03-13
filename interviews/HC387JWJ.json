@@ -1,0 +1,36 @@
+{
+  "code": "HC387JWJ",
+  "candidate_name": "Furkan Sevinç",
+  "position": "Yapay Zeka Mühendisliği",
+  "requirements": [],
+  "questions": [
+    "- \"Merhaba Furkan, öncelikle hoş geldin. Bize biraz kendinden bahseder misin? Ne tür deneyimlerin oldu ve bu deneyimlerin seni yapay zeka mühendisliği konusunda nasıl bir profesyonel haline getirdiğini anlatabilir misin?\"",
+    "- \"Yapay zeka mühendisliği pozisyonuna başvurmanı tetikleyen şey ne oldu? Bu alanda kariyer yapmayı neden istiyorsun, bize biraz bu motivasyonunu anlatır mısın?\"",
+    "- \"Yapay zeka projelerinde en önemli gördüğün teknik konular nelerdir ve bu konularda hangi yeteneklere sahip olduğunu düşünüyorsun?\"",
+    "- \"Kriz anında veya beklenmedik bir problemle karşılaştığında nasıl bir yaklaşım sergiliyorsun? Belki daha önce karşılaştığın ve nasıl çözdüğün bir problemi bizimle paylaşabilir misin?\"",
+    "- \"Takım çalışması senin için ne ifade ediyor ve daha önce bir takım içerisinde çalışma deneyimin oldu mu? Eğer olduysa, bu deneyiminden bize biraz bahseder misin?\""
+  ],
+  "created_at": "2025-03-08T21:36:17.911212",
+  "status": "completed",
+  "started_at": "2025-03-08T21:36:47.985327",
+  "conversation_history": [
+    {
+      "role": "user",
+      "content": "Merhaba nasılsın iyi misin?"
+    },
+    {
+      "role": "assistant",
+      "content": "Mülakata başlamak için 'Başlayalım' diyebilirsiniz."
+    },
+    {
+      "role": "user",
+      "content": "Hoşçakalın."
+    },
+    {
+      "role": "assistant",
+      "content": "Mülakata başlamak için 'Başlayalım' diyebilirsiniz."
+    }
+  ],
+  "ended": true,
+  "ended_at": "2025-03-08T21:37:50.268041"
+}

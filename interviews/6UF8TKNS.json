@@ -1,0 +1,36 @@
+{
+  "code": "6UF8TKNS",
+  "candidate_name": "Süleyman Kaplan",
+  "position": "yazılım uzmanı",
+  "requirements": [],
+  "questions": [
+    "- \"Merhaba Süleyman Bey, hoş geldiniz. Öncelikle bize biraz kendinizden ve yazılım uzmanı olarak edindiğiniz deneyimlerden bahseder misiniz?\"",
+    "- \"Yazılım uzmanı pozisyonuna başvurma nedeninizi anlatabilir misiniz? Bu pozisyon sizin kariyer hedeflerinizle nasıl örtüşüyor?\"",
+    "- \"Yazılım geliştirme ve kod yazma konusunda hangi programlama dillerinde deneyiminiz var? Özellikle hangi dilde daha rahat ve verimli çalışıyorsunuz?\"",
+    "- \"Bir projede karşılaştığınız bir problem karşısında nasıl bir çözüm yoluna giderdiniz? Bu konuda somut bir örnek verebilir misiniz?\"",
+    "- \"Bir takım içinde çalışırken, diğer takım üyeleri ile iletişim kurma ve işbirliği yapma konusunda nasıl bir yaklaşımınız olur? Bu konuda deneyimlerinizi paylaşabilir misiniz?\""
+  ],
+  "created_at": "2025-03-08T21:39:28.673644",
+  "status": "completed",
+  "started_at": "2025-03-08T21:39:30.913661",
+  "conversation_history": [
+    {
+      "role": "user",
+      "content": "Siz dinlenin."
+    },
+    {
+      "role": "assistant",
+      "content": "Mülakata başlamak için 'Başlayalım' diyebilirsiniz."
+    },
+    {
+      "role": "user",
+      "content": "Başlayalım."
+    },
+    {
+      "role": "assistant",
+      "content": "Merhaba Süleyman Kaplan, yazılım uzmanı pozisyonu için mülakatımıza hoş geldiniz.\n\nÖzgeçmişinizde belirttiğiniz bilgilere dayanarak, pozisyonun gerektirdiği yetkinlikler hakkında konuşacağız.\n\nİlk olarak, - \"Merhaba Süleyman Bey, hoş geldiniz. Öncelikle bize biraz kendinizden ve yazılım uzmanı olarak edindiğiniz deneyimlerden bahseder misiniz?\""
+    }
+  ],
+  "ended": true,
+  "ended_at": "2025-03-08T21:41:03.611972"
+}

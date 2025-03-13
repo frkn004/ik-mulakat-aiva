@@ -445,12 +445,13 @@
             bottom: 20px;
             background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
             box-shadow: 0 8px 16px rgba(239, 68, 68, 0.3);
-            display: none; /* Başlangıçta gizli */
+            padding: 10px 20px;
+            font-size: 1rem;
         }
 
         #endInterviewButton:hover {
             background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
-            box-shadow: 0 12px 20px rgba(239, 68, 68, 0.4);
+            transform: translateY(-2px);
         }
 
         .hidden {
@@ -601,7 +602,7 @@
             overflow: hidden;
             box-shadow: 0 10px 15px rgba(0, 0, 0, 0.2);
             z-index: 40;
-            display: none; /* Başlangıçta gizli */
+            display: block; /* Başlangıçta görünür */
         }
 
         #videoElement {
@@ -777,7 +778,7 @@
         let analyser = null;
         let silenceStart = null;
         let silenceTimeout = null;
-        let isAutoMode = true;
+        let isAutoMode = false; // Manuel mod varsayılan olarak aktif
         let isGPTSpeaking = false;
         let interviewEnded = false;
         let speechQueue = [];
@@ -856,155 +857,44 @@
         }
 
         // Sayfa yüklendiğinde
-        document.addEventListener('DOMContentLoaded', async () => {
-            // Modal'ı göster
-            showModal();
-
-            // Realtime oturumu başlat
-            const initialized = await initializeRealtimeSession();
-            if (!initialized) {
-                return;
-            }
-
-            // Ses sistemini başlat
-            await initAudio();
-            
-            // Diğer başlangıç ayarları...
-            updateAvatarState('idle');
-            
-            // Mülakata Başla/Mod butonu için event listener
-            document.getElementById('modeButton').addEventListener('click', async () => {
-                if (!interviewEnded) {
-                    if (document.getElementById('modeButton').classList.contains('interview-started')) {
-                        // Mod değiştirme
-                        if (isGPTSpeaking) {
-                            showError('Lütfen GPT konuşmasının bitmesini bekleyin');
-                            return;
-                        }
-                        
-                        isAutoMode = !isAutoMode;
-                        const modeButton = document.getElementById('modeButton');
-                        if (isAutoMode) {
-                            modeButton.innerHTML = '<i class="fas fa-microphone"></i> <span>Otomatik Mod</span>';
-                            updateStatus('Otomatik mod aktif', 'auto');
-                            updateAvatarState('listening');
-                            // Ses algılamayı başlat
-                            if (!isMediaRecorderReady) {
-                                await initAudio();
-                            }
-                            startVoiceDetection();
-                        } else {
-                            modeButton.innerHTML = '<i class="fas fa-hand"></i> <span>Manuel Mod</span>';
-                            updateStatus('Space tuşuna basılı tutarak konuşun', 'manual');
-                            updateAvatarState('idle');
-                            // Ses algılamayı durdur
-                            stopVoiceDetection();
-                            if (isRecording) {
-                                stopRecording();
-                            }
-                        }
+        document.addEventListener('DOMContentLoaded', function() {
+            // Ses sistemi kontrolü
+            async function checkTtsSupport() {
+                try {
+                    // Tarayıcı TTS desteğini kontrol et
+                    if ('speechSynthesis' in window) {
+                        console.log('TTS destekleniyor');
+                        return true;
                     } else {
-                        // Mülakatı başlat
-                        const modeButton = document.getElementById('modeButton');
-                        modeButton.classList.add('interview-started');
-                        modeButton.innerHTML = '<i class="fas fa-hand"></i> <span>Manuel Mod</span>';
-                        isAutoMode = false; // Manuel modda başlat
-                        
-                        // Mülakatı başlat
-                        const initialized = await initializeInterview();
-                        if (!initialized) {
-                            return;
-                        }
-                        
-                        startTimer(); // Süre sayacını başlat
+                        console.log('TTS desteklenmiyor');
+                        showError('Tarayıcınız ses sentezlemeyi desteklemiyor. Chrome tarayıcısını kullanmanızı öneririz.');
+                        return false;
                     }
+                } catch (error) {
+                    console.error('TTS kontrol hatası:', error);
+                    return false;
                 }
-            });
-
-            // Manuel Mod butonu için event listener
-            document.getElementById('manualModeButton').addEventListener('click', () => {
-                if (!interviewEnded) {
-                    isAutoMode = false;
-                    updateAvatarState('idle');
-                    updateStatus('Manuel mod aktif', 'manual');
-                }
-            });
-
-            // Otomatik Mod butonu için event listener
-            document.getElementById('autoModeButton').addEventListener('click', () => {
-                if (!interviewEnded) {
-                    isAutoMode = true;
-                    startVoiceDetection();
-                    updateAvatarState('listening');
-                    updateStatus('Otomatik mod aktif', 'auto');
-                }
-            });
-
-            // Mülakatı Bitir butonu için event listener
-            document.getElementById('endInterviewButton').addEventListener('click', async () => {
-                if (!interviewEnded) {
-                    if (confirm('Mülakatı bitirmek istediğinize emin misiniz?')) {
-                        await endInterview();
-                    }
-                }
-            });
-
-            // Space tuşu kontrolü
-            document.addEventListener('keydown', async (e) => {
-                if (e.code === 'Space' && !isAutoMode && !interviewEnded) {
-                    e.preventDefault();
-                    if (isGPTSpeaking) {
-                        showError('Lütfen GPT konuşmasının bitmesini bekleyin');
-                        return;
-                    }
-                    if (!isRecording) {
-                        if (!isMediaRecorderReady) {
-                            await initAudio();
-                        }
-                        startRecording();
-                        updateAvatarState('listening');
-                        updateStatus('Kaydediliyor...', 'recording');
-                    }
-                }
-            });
-
-            document.addEventListener('keyup', (e) => {
-                if (e.code === 'Space' && !isAutoMode && !interviewEnded) {
-                    e.preventDefault();
-                    if (isRecording) {
-                        stopRecording();
-                        updateAvatarState('idle');
-                        updateStatus('Space tuşuna basılı tutarak konuşun', 'manual');
-                    }
-                }
-            });
-
-            // Tarayıcı kapandığında rapor oluştur
-            window.addEventListener('beforeunload', async (event) => {
-                if (!interviewEnded) {
-                    // Sayfa yenileme veya kapatma durumunda rapor oluştur
-                    event.preventDefault();
-                    event.returnValue = '';
-                    
-                    try {
-                        // Mülakat durumunu kaydet
-                        await fetch('/save_interview_state', {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json'
-                            },
-                            body: JSON.stringify({
-                                code: interviewCode,
-                                conversation_history: chatHistory,
-                                ended: true
-                            })
-                        });
-                        
-                        // Rapor oluştur
-                        await generateReport();
-                    } catch (error) {
-                        console.error('Mülakat sonlandırma hatası:', error);
-                    }
+            }
+            
+            // TTS Kontrolü
+            checkTtsSupport();
+            
+            // Mülakat başlangıç zamanı
+            startTime = new Date();
+            
+            // Zamanlayıcıyı başlat
+            setInterval(updateTimer, 1000);
+            
+            // Kamerayı başlat
+            initCamera();
+            
+            // Buton olay dinleyicilerini ekle
+            setupButtonListeners();
+            
+            // "Mülakatı Bitir" butonu olay dinleyicisi
+            document.getElementById('endInterviewButton').addEventListener('click', async function() {
+                if (confirm("Mülakatı bitirmek istediğinizden emin misiniz?")) {
+                    await endInterview();
                 }
             });
         });
@@ -1361,16 +1251,10 @@
                         isSpeaking = false;
                         isGPTSpeaking = false;
 
-                        if (isAutoMode) {
-                            updateStatus('Sesinizi bekliyorum...', 'auto');
-                            updateAvatarState('listening');
-                            await initAudio();
-                            startVoiceDetection();
-                        } else {
-                            updateStatus('Space tuşuna basılı tutarak konuşun', 'manual');
-                            updateAvatarState('idle');
-                            await initAudio();
-                        }
+                        // Manuel mod aktif olduğu için manuel mod mesajını göster
+                        updateStatus('Space tuşuna basılı tutarak konuşun', 'manual');
+                        updateAvatarState('idle');
+                        await initAudio();
 
                         resolve();
                     };
@@ -1494,30 +1378,23 @@
                     updateAvatarState('speaking');
 
                     if (data.response) {
-                        // GPT konuşmaya başlamadan önce ses algılamayı durdur
-                        isGPTSpeaking = true;
-                        stopVoiceDetection();
-                        
-                        // Yanıt hazır
-                        updateProcessingStep('respond', 'completed');
-                        setTimeout(() => {
-                            hideProcessingSteps();
-                        }, 1000);
-
-                        // Önceki asistan mesajlarını temizle
-                        const existingAssistantMessages = document.querySelectorAll('.chat-bubble.assistant-bubble');
-                        existingAssistantMessages.forEach(msg => {
-                            msg.classList.add('fade-out');
-                            setTimeout(() => msg.remove(), 300);
-                        });
-
                         // Önce sesi oynat, sonra mesajı göster
                         await speakResponse(data.response);
                         addMessageToChat('assistant', data.response);
+                        
+                        // Son soru kontrolü - "bir sonraki konumuz" veya benzeri ifadeleri içermeyen, kapanış benzeri cümleler içeriyor mu?
+                        if (data.response.includes("Mülakat sorularımız tamamlandı") || 
+                            data.response.includes("Değerlendirme sonucunu") || 
+                            data.response.includes("İyi günler") || 
+                            data.response.includes("teşekkür ederiz")) {
+                            // Son soru tespit edildi, butonları güncelle
+                            document.getElementById('endInterviewButton').style.display = 'flex';
+                        }
                     }
                     
                     if (data.interview_ended) {
                         interviewEnded = true;
+                        document.getElementById('endInterviewButton').style.display = 'flex';
                         await endInterview();
                     }
                 } else {
@@ -1525,12 +1402,11 @@
                     showError(data.error || 'Ses işlenemedi');
                     
                     if (data.continue_listening && !interviewEnded) {
+                        // Manuel modda olduğumuz için otomatik dinlemeyi yeniden başlatmayız
+                        // Sadece durum metnini güncelle
                         setTimeout(async () => {
-                            if (isAutoMode) {
-                                updateAvatarState('listening');
-                                updateStatus('Sesinizi bekliyorum...', 'auto');
-                                startVoiceDetection();
-                            }
+                            updateStatus('Space tuşuna basılı tutarak konuşun', 'manual');
+                            updateAvatarState('idle');
                         }, 1000);
                     }
                 }
@@ -1540,12 +1416,11 @@
                 showError('Sunucu ile iletişim hatası: ' + error.message);
                 
                 if (!interviewEnded) {
+                    // Manuel modda olduğumuz için otomatik dinlemeyi yeniden başlatmayız
+                    // Sadece durum metnini güncelle
                     setTimeout(async () => {
-                        if (isAutoMode) {
-                            updateAvatarState('listening');
-                            updateStatus('Sesinizi bekliyorum...', 'auto');
-                            startVoiceDetection();
-                        }
+                        updateStatus('Space tuşuna basılı tutarak konuşun', 'manual');
+                        updateAvatarState('idle');
                     }, 1000);
                 }
             }
@@ -1850,7 +1725,7 @@
                            class="inline-block bg-gradient-to-r from-green-500 to-green-600 
                                   hover:from-green-600 hover:to-green-700 text-white 
                                   font-medium py-2 px-6 rounded-lg transition-all duration-300">
-                            <i class="fas fa-file-pdf mr-2"></i>Raporu Görüntüle
+                            <i class="fas fa-file-pdf mr-2"></i>Raporu İndir
                         </a>
                     </div>
                 `;
@@ -1892,25 +1767,6 @@
                 showError('Rapor oluşturulurken bir hata oluştu: ' + error.message);
                 return false;
             }
-        }
-
-        function addDownloadButton(reportUrl) {
-            const container = document.querySelector('.chat-container');
-            const downloadDiv = document.createElement('div');
-            downloadDiv.className = 'fixed bottom-4 right-4 flex gap-4';
-            
-            const downloadButton = document.createElement('button');
-            downloadButton.className = 'bg-indigo-600 text-white px-6 py-3 rounded-lg shadow-lg hover:bg-indigo-700 transition-colors';
-            downloadButton.innerHTML = '<i class="fas fa-download mr-2"></i>Raporu İndir';
-            downloadButton.onclick = () => {
-                const link = document.createElement('a');
-                link.href = reportUrl;
-                link.download = `mulakat_raporu_${new Date().toISOString().slice(0,10)}.pdf`;
-                link.click();
-            };
-            
-            downloadDiv.appendChild(downloadButton);
-            container.appendChild(downloadDiv);
         }
 
         function showSuccess(message) {
@@ -2148,6 +2004,109 @@
             
             document.getElementById('cameraContainer').style.display = 'none';
             cameraActive = false;
+        }
+
+        function addDownloadButton(reportUrl) {
+            const container = document.querySelector('.chat-container');
+            const downloadDiv = document.createElement('div');
+            downloadDiv.className = 'fixed bottom-4 right-4 flex gap-4';
+            
+            const downloadButton = document.createElement('button');
+            downloadButton.className = 'bg-indigo-600 text-white px-6 py-3 rounded-lg shadow-lg hover:bg-indigo-700 transition-colors';
+            downloadButton.innerHTML = '<i class="fas fa-download mr-2"></i>Raporu İndir';
+            downloadButton.onclick = () => {
+                const link = document.createElement('a');
+                link.href = reportUrl;
+                link.download = `mulakat_raporu_${new Date().toISOString().slice(0,10)}.pdf`;
+                link.click();
+            };
+            
+            downloadDiv.appendChild(downloadButton);
+            container.appendChild(downloadDiv);
+        }
+
+        // Buton olay dinleyicilerini kurma fonksiyonu
+        function setupButtonListeners() {
+            // Mülakat başlatma butonu
+            const modeButton = document.getElementById('modeButton');
+            if (modeButton) {
+                modeButton.addEventListener('click', async function() {
+                    // Mülakatı başlat ve TTS için izin iste
+                    await initAudio();
+                    
+                    // Butonları güncelle - sadece mülakat başlatma butonunu gizle
+                    modeButton.style.display = 'none';
+                    
+                    // Manuel mod aktif - otomatik mod butonunu asla gösterme
+                    document.getElementById('manualModeButton').style.display = 'flex'; // Manuel mod butonunu göster
+                    document.getElementById('autoModeButton').style.display = 'none';
+                    
+                    // Manuel mod aktif
+                    isAutoMode = false;
+                    updateStatus('Manuel mod aktif - Space tuşuna basılı tutarak konuşun', 'manual');
+                    updateAvatarState('idle');
+                    
+                    // Süreyi başlat
+                    startTimer();
+                    
+                    // Sunucuya mülakatı başlat bildirimi gönder
+                    try {
+                        const response = await fetch('/start_interview', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify({
+                                code: interviewCode
+                            })
+                        });
+                        
+                        const data = await response.json();
+                        if (data.success && data.welcome_message) {
+                            addMessageToChat('assistant', data.welcome_message);
+                            await speakResponse(data.welcome_message);
+                        }
+                    } catch (error) {
+                        console.error('Mülakat başlatma hatası:', error);
+                        showError('Mülakat başlatılamadı');
+                    }
+                });
+            }
+            
+            // Manuel mod butonu için yeni bir event listener ekle (sadece bilgi amaçlı)
+            const manualModeButton = document.getElementById('manualModeButton');
+            if (manualModeButton) {
+                manualModeButton.addEventListener('click', function() {
+                    // Bilgi mesajı göster
+                    showSuccess('Zaten manuel moddasınız. Space tuşuna basılı tutarak konuşabilirsiniz.');
+                });
+            }
+            
+            // Otomatik mod butonunun event listener'larını kaldır
+            const autoModeButton = document.getElementById('autoModeButton');
+            if (autoModeButton) {
+                // Otomatik mod butonunu gizle
+                autoModeButton.style.display = 'none';
+            }
+            
+            // Space tuşu için olay dinleyicisi (manuel modda)
+            document.addEventListener('keydown', function(e) {
+                if (e.code === 'Space' && !isGPTSpeaking && !interviewEnded) {
+                    e.preventDefault();
+                    startRecording();
+                    updateStatus('Konuşun...', 'recording');
+                }
+            });
+            
+            document.addEventListener('keyup', function(e) {
+                if (e.code === 'Space' && !isGPTSpeaking && !interviewEnded) {
+                    e.preventDefault();
+                    if (isRecording) {
+                        stopRecording();
+                        updateStatus('İşleniyor...', 'processing');
+                    }
+                }
+            });
         }
 
     </script>

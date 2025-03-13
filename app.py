@@ -387,9 +387,11 @@ class InterviewAssistant(VoiceAssistant):
                 ]
                 return random.choice(transition_phrases), False
             else:
+                # Son soruya gelindi, mülakat kapanış mesajı
                 closing_message = """Mülakat sorularımız tamamlandı. Paylaştığınız değerli bilgiler ve ayırdığınız zaman için teşekkür ederiz. 
                 
 Değerlendirme sonucunu en kısa sürede size ileteceğiz. İyi günler dilerim."""
+                # İkinci parametre True olarak döndürülüyor, bu mülakat bittiğini gösterir
                 return closing_message, True
 
         except Exception as e:
@@ -1056,8 +1058,15 @@ async def process_audio():
 
             logger.info(f"GPT yanıtı: {gpt_response}")
             
-            # Mülakat bittiğinde istemciye bildir
+            # Mülakat bitiş kontrolü - get_gpt_response'tan gelen is_interview_ended değeri 
+            # veya yanıtta özel "MÜLAKAT_BİTTİ" işareti var mı?
             interview_ended = is_interview_ended or "MÜLAKAT_BİTTİ" in gpt_response
+            
+            # Son soru olup olmadığını kontrol et
+            if current_interview.current_question_index >= len(current_interview.interview_questions) - 1:
+                # Son soru soruldu, mülakat bitiyor
+                interview_ended = True
+                logger.info("Son soru soruldu, mülakat bitiyor")
             
             # Eğer mülakat bittiyse, "MÜLAKAT_BİTTİ" cümlesini yanıttan çıkar
             if "MÜLAKAT_BİTTİ" in gpt_response:
@@ -1152,7 +1161,7 @@ async def generate_report():
         
         # GPT'den değerlendirme al
         client = OpenAI()
-        response = await client.chat.completions.create(
+        response = client.chat.completions.create(
             model="gpt-4-turbo-preview",
             messages=[{"role": "system", "content": "Sen bir mülakat değerlendirme uzmanısın."},
                      {"role": "user", "content": prompt}],
@@ -1981,14 +1990,15 @@ async def get_speech():
         temp_filename = f"temp/speech_{int(time.time())}_{random.randint(100000, 999999)}.mp3"
         
         try:
-            # OpenAI TTS ile sesi oluştur
-            async with openai_client.audio.speech.with_streaming_response.create(
+            # OpenAI TTS ile sesi oluştur - context manager kullanmadan
+            tts_response = openai_client.audio.speech.create(
                 model="tts-1",
                 voice="nova",
                 input=text
-            ) as tts_response:
-                # Ses dosyasını kaydet
-                await tts_response.stream_to_file(temp_filename)
+            )
+            
+            # Ses dosyasını kaydet
+            tts_response.stream_to_file(temp_filename)
             
             # Dosyayı oku ve yanıt olarak gönder
             def generate():
