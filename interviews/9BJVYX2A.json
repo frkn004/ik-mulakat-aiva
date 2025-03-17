@@ -1,0 +1,38 @@
+{
+  "code": "9BJVYX2A",
+  "candidate_name": "Süleyman Kaplan",
+  "position": "CEO",
+  "requirements": [],
+  "questions": [
+    "\"Süleyman Bey, hoş geldiniz. Sizden, bugüne kadar edindiğiniz profesyonel deneyimler ve bu deneyimlerin sizi nasıl bu pozisyona taşıdığını anlatmanızı rica edebilir miyim?\"",
+    "\"Süleyman Bey, bir CEO olarak hangi teknik bilgilere sahip olduğunuzu ve bu bilgilerin sizin için nasıl bir fark yarattığını anlatır mısınız?\"",
+    "\"Karşılaştığınız zorlu bir problemi nasıl çözdüğünüzü bizimle paylaşabilir misiniz? Bu durumda hangi stratejileri uyguladınız ve sonucu nasıl etkiledi?\"",
+    "\"Geçmişteki yönetim deneyimlerinizde, başarılı bir takım oluşturmanın ve bu takımın motivasyonunu yüksek tutmanın önemini nasıl vurguladınız? Bu konuda neler öğrendiniz?\"",
+    "\"Son olarak, bir lider olarak, farklı disiplinlerden kişilerle nasıl etkili bir iletişim kurduğunuzdan ve bu iletişimin iş sonuçlarına nasıl yansıdığından bahseder misiniz?\""
+  ],
+  "created_at": "2025-03-14T15:58:00.955458",
+  "status": "active",
+  "started_at": "2025-03-14T15:59:34.503863",
+  "photos": [
+    {
+      "filename": "20250314155941.jpg",
+      "timestamp": "2025-03-14T12:59:41.175Z",
+      "path": "9BJVYX2A_photos/20250314155941.jpg"
+    },
+    {
+      "filename": "20250314160001.jpg",
+      "timestamp": "2025-03-14T13:00:01.192Z",
+      "path": "9BJVYX2A_photos/20250314160001.jpg"
+    },
+    {
+      "filename": "20250314160026.jpg",
+      "timestamp": "2025-03-14T13:00:26.196Z",
+      "path": "9BJVYX2A_photos/20250314160026.jpg"
+    },
+    {
+      "filename": "20250314160041.jpg",
+      "timestamp": "2025-03-14T13:00:41.199Z",
+      "path": "9BJVYX2A_photos/20250314160041.jpg"
+    }
+  ]
+}

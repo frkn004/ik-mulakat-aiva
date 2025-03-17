@@ -2107,7 +2107,111 @@
                     }
                 }
             });
+            
+            // Mülakatı bitirme butonu
+            const endInterviewButton = document.getElementById('endInterviewButton');
+            if (endInterviewButton) {
+                endInterviewButton.addEventListener('click', async function() {
+                    if (confirm('Mülakatı bitirmek istediğinizden emin misiniz?')) {
+                        try {
+                            // Kamera ve ses kaydını durdur
+                            stopCamera();
+                            stopRecording();
+                            
+                            // Sunucuya mülakatı bitir bildirimi gönder
+                            const response = await fetch('/end_interview', {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json'
+                                },
+                                body: JSON.stringify({
+                                    code: interviewCode,
+                                    conversation_history: chatHistory
+                                })
+                            });
+                            
+                            const data = await response.json();
+                            if (data.success) {
+                                // Rapor oluştur
+                                const reportResponse = await fetch('/generate_report', {
+                                    method: 'POST',
+                                    headers: {
+                                        'Content-Type': 'application/json'
+                                    },
+                                    body: JSON.stringify({
+                                        interview_code: interviewCode,
+                                        conversation_history: chatHistory
+                                    })
+                                });
+                                
+                                const reportData = await reportResponse.json();
+                                if (reportData.success && reportData.report_url) {
+                                    // Rapor indirme butonunu ekle
+                                    addDownloadButton(reportData.report_url);
+                                    showSuccess('Mülakat tamamlandı ve rapor oluşturuldu!');
+                                } else {
+                                    showError('Rapor oluşturulurken bir hata oluştu: ' + reportData.error);
+                                }
+                            } else {
+                                showError('Mülakat sonlandırılırken bir hata oluştu: ' + data.error);
+                            }
+                        } catch (error) {
+                            console.error('Mülakat bitirme hatası:', error);
+                            showError('Mülakat sonlandırılırken bir hata oluştu');
+                        }
+                    }
+                });
+            }
         }
+            
+            // Mülakat başladıktan 5 dakika sonra bitirme butonunu göster
+            function showEndInterviewButton() {
+                setTimeout(() => {
+                    const endInterviewButton = document.getElementById('endInterviewButton');
+                    if (endInterviewButton) {
+                        endInterviewButton.classList.remove('hidden');
+                    }
+                }, 300000); // 5 dakika
+            }
+
+            // Mülakat başlatma butonuna tıklandığında bitirme butonunu gösterme zamanlayıcısını başlat
+            modeButton.addEventListener('click', function() {
+                showEndInterviewButton();
+            });
+        }
+
+        // Son soru kontrolü ve bitirme butonu gösterme
+        function checkLastQuestion() {
+            const currentQuestionIndex = current_interview?.current_question_index || 0;
+            const totalQuestions = current_interview?.interview_questions?.length || 0;
+            
+            // Eğer son soruya gelindiyse bitirme butonunu göster
+            if (currentQuestionIndex >= totalQuestions - 1) {
+                const endInterviewButton = document.getElementById('endInterviewButton');
+                if (endInterviewButton) {
+                    endInterviewButton.classList.remove('hidden');
+                }
+            }
+        }
+
+        // Her yanıt alındığında son soru kontrolü yap
+        async function processResponse(response) {
+            if (response.success) {
+                addMessageToChat('assistant', response.response);
+                await speakResponse(response.response);
+                
+                // Son soru kontrolü
+                checkLastQuestion();
+            } else {
+                showError(response.error || 'Bir hata oluştu');
+            }
+        }
+
+        // Mülakat başlatma butonuna tıklandığında
+        modeButton.addEventListener('click', function() {
+            // Son soru kontrolünü başlat
+            checkLastQuestion();
+        });
 
     </script>
 </body>

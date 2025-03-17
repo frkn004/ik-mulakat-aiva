@@ -1199,79 +1199,52 @@ async def generate_report():
         elements = []
         
         # Başlık
-        elements.append(Paragraph(f"Mülakat Değerlendirme Raporu", styles['Title']))
-        elements.append(Spacer(1, 12))
+        title_style = ParagraphStyle(
+            'CustomTitle',
+            parent=styles['Heading1'],
+            fontSize=24,
+            spaceAfter=30
+        )
+        elements.append(Paragraph(f"Mülakat Değerlendirme Raporu - {interview_data.get('candidate_name')}", title_style))
         
-        # Aday Bilgileri
-        elements.append(Paragraph(f"Aday: {interview_data.get('candidate_name')}", styles['Heading2']))
-        elements.append(Paragraph(f"Pozisyon: {interview_data.get('position')}", styles['Normal']))
-        elements.append(Paragraph(f"Tarih: {interview_data.get('created_at')}", styles['Normal']))
-        elements.append(Spacer(1, 12))
+        # Temel Bilgiler
+        info_style = ParagraphStyle(
+            'Info',
+            parent=styles['Normal'],
+            fontSize=12,
+            spaceAfter=20
+        )
+        elements.append(Paragraph(f"Pozisyon: {interview_data.get('position')}", info_style))
+        elements.append(Paragraph(f"Tarih: {interview_data.get('created_at')}", info_style))
+        elements.append(Paragraph(f"Genel Skor: {overall_score}/10", info_style))
         
         # Skorlar
         elements.append(Paragraph("Değerlendirme Skorları", styles['Heading2']))
-        for category, score in scores.items():
-            elements.append(Paragraph(f"{category.replace('_', ' ').title()}: {score}/10", styles['Normal']))
-        elements.append(Paragraph(f"Genel Skor: {overall_score}/10", styles['Normal']))
-        elements.append(Spacer(1, 12))
+        for criterion, score in scores.items():
+            elements.append(Paragraph(f"{criterion.replace('_', ' ').title()}: {score}/10", info_style))
         
-        # Detaylı Değerlendirme
-        elements.append(Paragraph("Detaylı Değerlendirme", styles['Heading2']))
-        for section, content in sections.items():
-            elements.append(Paragraph(f"{section.replace('_', ' ').title()}", styles['Heading3']))
-            elements.append(Paragraph(content, styles['Normal']))
-            elements.append(Spacer(1, 12))
-            
-        # Konuşma Akışı
-        elements.append(Paragraph("Mülakat Konuşma Akışı", styles['Heading2']))
-        for message in conversation_history:
-            role = "Aday" if message['role'] == 'user' else "Mülakat Asistanı"
-            elements.append(Paragraph(f"{role}:", styles['Heading4']))
-            elements.append(Paragraph(message['content'], styles['Normal']))
-            elements.append(Spacer(1, 6))
+        # Bölümler
+        for section_title, content in sections.items():
+            elements.append(Paragraph(section_title.replace('_', ' ').title(), styles['Heading2']))
+            elements.append(Paragraph(content, info_style))
         
         # PDF'i oluştur
         doc.build(elements)
         
-        # Webhook URL'sini kontrol et
-        webhook_url = interview_data.get('webhook_rapor_url') or os.getenv('WEBHOOK_RAPOR_URL')
-        
-        if webhook_url:
-            # Webhook verilerini hazırla
-            webhook_data = {
-                'interview_code': interview_code,
-                'candidate_name': interview_data.get('candidate_name'),
-                'position': interview_data.get('position'),
-                'date': interview_data.get('created_at'),
-                'evaluation': {
-                    'scores': scores,
-                    'overall_score': overall_score,
-                    'sections': sections
-                },
-                'pdf_path': pdf_path
-            }
-            
-            try:
-                # Webhook'u gönder
-                webhook_response = requests.post(webhook_url, json=webhook_data, timeout=5)
-                webhook_response.raise_for_status()
-                logging.info(f"Webhook başarıyla gönderildi: {webhook_response.status_code}")
-            except Exception as e:
-                logging.error(f"Webhook gönderimi başarısız: {str(e)}")
+        # Rapor URL'sini oluştur
+        report_url = url_for('serve_report', filename=pdf_filename, _external=True)
         
         return jsonify({
             'success': True,
-            'pdf_path': pdf_path,
-            'evaluation': {
-                'scores': scores,
-                'overall_score': overall_score,
-                'sections': sections
-            }
+            'report_url': report_url
         })
         
     except Exception as e:
         logging.error(f"Rapor oluşturma hatası: {str(e)}")
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
 
 def extract_score(text, category):
     """Metinden puan çıkarma"""
