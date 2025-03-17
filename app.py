@@ -10,7 +10,7 @@ from queue import Queue
 import asyncio
 import concurrent.futures
 import logging
-from flask import Flask, request, jsonify, render_template, redirect, send_from_directory, Response, session, url_for, send_file
+from flask import Flask, request, jsonify, render_template, redirect, send_from_directory, Response, session, url_for
 from flask_cors import CORS
 from datetime import datetime, timedelta
 import json
@@ -585,9 +585,9 @@ Değerlendirme sonucunu en kısa sürede size ileteceğiz. İyi günler dilerim.
     def send_report_webhook(self, pdf_path, evaluation_data):
         """Raporu webhook'a gönder"""
         try:
-            # PDF dosya adını URL'ye dönüştür
-            pdf_filename = os.path.basename(pdf_path)
-            report_url = url_for('serve_report', filename=pdf_filename, _external=True)
+            # PDF dosyasını Base64'e çevir
+            with open(pdf_path, 'rb') as pdf_file:
+                pdf_base64 = base64.b64encode(pdf_file.read()).decode('utf-8')
             
             # Mülakat verilerini hazırla
             interview_summary = {
@@ -608,7 +608,8 @@ Değerlendirme sonucunu en kısa sürede size ileteceğiz. İyi günler dilerim.
                 },
                 "degerlendirme": evaluation_data,
                 "konusma_akisi": self.conversation_history,
-                "rapor_url": report_url,  # PDF dosyasının kendisi yerine URL'si gönderiliyor
+                "pdf_base64": pdf_base64,  # PDF dosyası yerine Base64 formatında gönderme
+                "pdf_dosya_adi": os.path.basename(pdf_path),
                 "olusturulma_tarihi": datetime.now().isoformat()
             }
             
@@ -639,40 +640,901 @@ Değerlendirme sonucunu en kısa sürede size ileteceğiz. İyi günler dilerim.
                 logger.info(f"Rapor webhook'a başarıyla gönderildi: {self.code}")
                 return True
             else:
-                logger.error(f"Rapor webhook'a gönderilemedi: {response.status_code} - {response.text}")
+                logger.error(f"Webhook hatası: {response.status_code} - {response.text}")
                 return False
+                
         except Exception as e:
             logger.error(f"Webhook gönderme hatası: {str(e)}")
             return False
 
-@app.route('/reports/<filename>')
-def serve_report(filename):
-    """Raporları sunmak için route"""
-    try:
-        # Güvenlik kontrolü - sadece pdf dosyalarına izin ver ve path traversal saldırılarını engelle
-        if not filename.endswith('.pdf') or '..' in filename or '/' in filename:
-            return 'Geçersiz dosya ismi', 400
-            
-        # Reports klasörünün varlığını kontrol et
-        if not os.path.exists('reports'):
-            os.makedirs('reports', exist_ok=True)
-            
-        # Dosya yolunu oluştur
-        file_path = os.path.join('reports', filename)
+def generate_interview_code():
+    """Benzersiz bir mülakat kodu oluştur"""
+    code = ''.join(secrets.choice(string.ascii_uppercase + string.digits) for _ in range(8))
+    return code
+
+# Login için gerekli decorator
+def login_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if not session.get('logged_in'):
+            logger.debug("Oturum bulunamadı, login sayfasına yönlendiriliyor")
+            return redirect(url_for('login'))
+        logger.debug(f"Oturum doğrulandı: {session.get('user_id')}")
+        return f(*args, **kwargs)
+    return decorated_function
+
+# Login bilgilerini .env'den al
+ADMIN_EMAIL = os.getenv('ADMIN_EMAIL')
+ADMIN_PASSWORD = os.getenv('ADMIN_PASSWORD')
+
+# Login sayfası route'u
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    # Eğer zaten giriş yapılmışsa, direkt create_interview'a yönlendir
+    if session.get('logged_in'):
+        logger.debug("Kullanıcı zaten giriş yapmış, create_interview'a yönlendiriliyor")
+        return redirect(url_for('create_interview'))
         
-        # Dosyanın varlığını kontrol et
-        if not os.path.exists(file_path):
-            return 'Rapor bulunamadı', 404
+    if request.method == 'POST':
+        username = request.form.get('username', '').strip()
+        password = request.form.get('password', '').strip()
+        
+        logger.debug(f"Login denemesi - Kullanıcı: {username}")
+        logger.debug(f"Beklenen kullanıcı: {ADMIN_EMAIL}")
+        
+        # Sadece .env'den alınan bilgileri kullan
+        if username and password and username == ADMIN_EMAIL and password == ADMIN_PASSWORD:
+            logger.debug("Login başarılı")
+            session.clear()
+            session['logged_in'] = True
+            session['user_id'] = username
+            session.permanent = True
+            logger.debug("Session oluşturuldu, create_interview'a yönlendiriliyor")
+            return redirect(url_for('create_interview'))
+        else:
+            logger.debug(f"Login başarısız - Girilen kullanıcı: {username}")
+            return render_template('login.html', error="Geçersiz kullanıcı adı veya şifre")
+    
+    return render_template('login.html')
+
+# Çıkış yapma route'u
+@app.route('/logout')
+def logout():
+    session.clear()
+    return redirect(url_for('login'))
+
+# Mülakat oluşturma sayfasını login_required ile koruyalım
+@app.route('/')
+def home():
+    if not session.get('logged_in'):
+        return redirect(url_for('login'))
+    return redirect(url_for('create_interview'))
+
+@app.route('/join')
+def join():
+    return render_template('interview_entry.html')
+
+@app.route('/interview')
+def interview():
+    code = request.args.get('code')
+    if not code:
+        return render_template('error.html', error="Mülakat kodu gereklidir"), 400
+        
+    try:
+        # JSON dosyasından mülakat verilerini al
+        json_path = os.path.join('interviews', f'{code}.json')
+        if not os.path.exists(json_path):
+            return render_template('error.html', error="Geçersiz mülakat kodu"), 404
             
-        # PDF dosyasını gönder
-        return send_file(file_path, 
-                         mimetype='application/pdf',
-                         as_attachment=True,
-                         download_name=filename)
+        with open(json_path, 'r', encoding='utf-8') as f:
+            interview_data = json.load(f)
+            
+        # Mülakat durumunu kontrol et
+        if interview_data.get('status') == 'completed' or interview_data.get('ended'):
+            return render_template('error.html', 
+                error="Bu mülakat daha önce tamamlanmış. Aynı mülakat kodunu tekrar kullanamazsınız."), 403
+            
+        # Interview data'yı güncelle
+        interview_data['status'] = 'active'
+        interview_data['started_at'] = datetime.now().isoformat()
+        
+        # Değişiklikleri kaydet
+        with open(json_path, 'w', encoding='utf-8') as f:
+            json.dump(interview_data, f, ensure_ascii=False, indent=2)
+            
+        # Global current_interview'ı oluştur
+        global current_interview
+        current_interview = InterviewAssistant()
+        current_interview.set_interview_details(code)
+        
+        return render_template('interview.html', 
+                             interview={
+                                 "candidate_name": interview_data.get("candidate_name"),
+                                 "position": interview_data.get("position"),
+                                 "code": code,
+                                 "created_at": interview_data.get("created_at")
+                             })
+                             
+    except Exception as e:
+        logger.error(f"Mülakat sayfası yükleme hatası: {str(e)}")
+        return render_template('error.html', error="Mülakat yüklenirken bir hata oluştu"), 500
+
+@app.route('/create_interview', methods=['GET', 'POST'])
+@login_required
+def create_interview():
+    """Yeni bir mülakat oluştur"""
+    if request.method == 'GET':
+        return render_template('create_interview.html')
+        
+    try:
+        data = request.get_json()
+        candidate_name = data.get('candidate_name')
+        position = data.get('position')
+        
+        if not candidate_name or not position:
+            return jsonify({
+                'success': False,
+                'error': 'Aday adı ve pozisyon gereklidir'
+            })
+            
+        try:
+            # GPT ile pozisyona özel sorular oluştur
+            prompt = f"""
+            {position} pozisyonu için mülakat soruları oluştur.
+            
+            Aday Bilgileri:
+            - İsim: {candidate_name}
+            - Pozisyon: {position}
+            
+            Önemli Kurallar:
+            1. Kesinlikle "1. soru", "2. soru" gibi numaralandırma kullanma
+            2. Her soru doğal bir sohbet akışının parçası olmalı
+            3. Sorular şu konuları kapsamalı:
+               - Genel deneyim ve motivasyon
+               - Pozisyona özel teknik bilgi
+               - Problem çözme yaklaşımı
+               - Takım çalışması ve iletişim
+            
+            Örnek Doğal Soru Formatı:
+            - "Bize biraz kendinizden ve kariyerinizden bahseder misiniz?"
+            - "Bu pozisyona başvurmanızın arkasındaki motivasyonunuz nedir?"
+            - "[Teknik konu] hakkındaki deneyimlerinizi paylaşır mısınız?"
+            
+            Lütfen 4-5 adet doğal ve akıcı soru oluştur. Sorular Türkçe olmalı ve bir sohbet akışı içinde sorulabilecek şekilde olmalı."""
+            
+            response = openai_client.chat.completions.create(
+                model="gpt-4",
+                messages=[
+                    {"role": "system", "content": "Sen bir kıdemli İK uzmanısın. Doğal ve etkili mülakat soruları oluşturuyorsun."},
+                    {"role": "user", "content": prompt}
+                ],
+                temperature=0.7,
+                max_tokens=1000
+            )
+            
+            # GPT yanıtından soruları al
+            custom_questions = response.choices[0].message.content.strip().split('\n')
+            # Boş satırları temizle
+            custom_questions = [q.strip() for q in custom_questions if q.strip()]
+            
+            logger.info(f"GPT tarafından {len(custom_questions)} soru oluşturuldu")
+            
+        except Exception as e:
+            logger.error(f"GPT soru oluşturma hatası: {str(e)}")
+            # Hata durumunda varsayılan soruları kullan
+            custom_questions = [
+                "Bize biraz kendinizden ve kariyerinizden bahseder misiniz?",
+                "Bu pozisyona başvurmanızın arkasındaki motivasyonunuz nedir?",
+                "Şimdiye kadar karşılaştığınız en zorlu teknik problemi ve nasıl çözdüğünüzü anlatır mısınız?",
+                "Takım çalışması deneyimlerinizden bahseder misiniz?"
+            ]
+            
+        # Benzersiz kod oluştur
+        interview_code = generate_interview_code()
+        
+        # Mülakat verilerini hazırla
+        interview_info = {
+            "candidate_info": {
+                "name": candidate_name,
+                "position": position,
+                "requirements": data.get('requirements', []),
+                "custom_questions": custom_questions
+            },
+            "created_at": datetime.now().isoformat(),
+            "expires_at": (datetime.now() + timedelta(hours=24)).isoformat(),
+            "status": "active"
+        }
+        
+        try:
+            # Memory'ye kaydet
+            interview_data[interview_code] = interview_info
+            
+            # JSON dosyasına kaydet
+            json_path = os.path.join('interviews', f'{interview_code}.json')
+            with open(json_path, 'w', encoding='utf-8') as f:
+                json.dump({
+                    "code": interview_code,
+                    "candidate_name": candidate_name,
+                    "position": position,
+                    "requirements": interview_info["candidate_info"]["requirements"],
+                    "questions": custom_questions,
+                    "created_at": interview_info["created_at"],
+                    "status": "active"
+                }, f, ensure_ascii=False, indent=2)
+                
+            logger.info(f"Yeni mülakat oluşturuldu: {interview_code}")
+            
+            # Mülakat linkini oluştur
+            domain = os.getenv('DOMAIN_NAME', request.host_url.rstrip('/'))
+            
+            # HTTPS kontrolü
+            protocol = 'https' if request.is_secure or 'https' in request.host_url else 'http'
+            
+            # Ana domain ve alt domainler için farklı URL'ler oluştur
+            interview_urls = {
+                'main': f"{protocol}://{domain}/interview?code={interview_code}",
+                'create': f"{protocol}://{domain}/",
+                'join': f"{protocol}://{domain}/join"
+            }
+            
+            return jsonify({
+                'success': True,
+                'code': interview_code,
+                'urls': interview_urls,
+                'questions': custom_questions
+            })
+            
+        except Exception as e:
+            logger.error(f"Mülakat kaydetme hatası: {str(e)}")
+            return jsonify({
+                'success': False,
+                'error': 'Mülakat kaydedilemedi'
+            })
+            
+    except Exception as e:
+        logger.error(f"Mülakat oluşturma hatası: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        })
+
+@app.route('/verify_code', methods=['POST'])
+def verify_code():
+    """Mülakat kodunu doğrula"""
+    try:
+        data = request.get_json()
+        code = data.get('code')
+
+        if not code:
+            return jsonify({
+                'success': False,
+                'error': 'Mülakat kodu gerekli'
+            })
+
+        try:
+            # Önce memory'de kontrol et
+            if code in interview_data:
+                return jsonify({'success': True})
+                
+            # JSON dosyasından kontrol et
+            json_path = os.path.join('interviews', f'{code}.json')
+            if os.path.exists(json_path):
+                with open(json_path, 'r', encoding='utf-8') as f:
+                    interview_json = json.load(f)
+                    
+                # Interview data'yı güncelle
+                interview_data[code] = {
+                    "candidate_info": {
+                        "name": interview_json.get("candidate_name"),
+                        "position": interview_json.get("position"),
+                        "requirements": interview_json.get("requirements", []),
+                        "custom_questions": interview_json.get("questions", [])
+                    },
+                    "created_at": interview_json.get("created_at", datetime.now().isoformat()),
+                    "expires_at": (datetime.now() + timedelta(hours=24)).isoformat(),
+                    "status": "active"
+                }
+                
+                return jsonify({'success': True})
+                
+            return jsonify({
+                'success': False,
+                'error': 'Geçersiz mülakat kodu'
+            })
+            
+        except Exception as e:
+            logger.error(f"Kod doğrulama işlem hatası: {str(e)}")
+            return jsonify({
+                'success': False,
+                'error': 'Kod doğrulanamadı'
+            })
+            
+    except Exception as e:
+        logger.error(f"Kod doğrulama genel hatası: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        })
+
+@app.route('/start_interview', methods=['POST'])
+async def start_interview():
+    try:
+        data = request.json
+        if not data or 'code' not in data:
+            return jsonify({
+                "success": False,
+                "error": "Mülakat kodu gerekli"
+            }), 400
+
+        global current_interview
+        current_interview = InterviewAssistant()
+        current_interview.set_interview_details(data['code'])
+        
+        # Hoşgeldin mesajını al
+        welcome_message = "Merhaba, mülakata başlamak için hazır olduğunuzda 'Başlayalım' diyebilirsiniz."
+        
+        logger.info(f"Mülakat başlatıldı: {data['code']}")
+        
+        return jsonify({
+            "success": True,
+            "welcome_message": welcome_message
+        })
+        
+    except Exception as e:
+        logger.error(f"Mülakat başlatma hatası: {str(e)}")
+        return jsonify({
+            "success": False,
+            "error": f"Mülakat başlatılamadı: {str(e)}"
+        }), 500
+
+@app.route('/start_recording', methods=['POST'])
+async def start_recording():
+    try:
+        if not current_interview:
+            return jsonify({
+                "success": False,
+                "error": "Lütfen önce mülakatı başlatın"
+            }), 400
+            
+        # Ses kaydını başlat
+        recording = current_interview.record_audio()
+        if recording:
+            filename = current_interview.save_audio(recording)
+            return jsonify({
+                "success": True,
+                "message": "Ses kaydı başarıyla tamamlandı",
+                "filename": filename
+            })
+        else:
+            return jsonify({
+                "success": False,
+                "error": "Ses kaydı alınamadı"
+            }), 400
+        
+    except Exception as e:
+        logger.error(f"Ses kaydı başlatma hatası: {str(e)}")
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
+
+@app.route('/process_audio', methods=['POST'])
+async def process_audio():
+    try:
+        audio_file = request.files.get('audio')
+        if not audio_file:
+            return jsonify({
+                'success': False,
+                'error': 'Ses dosyası gerekli'
+            })
+
+        # Geçici dizini kontrol et
+        if not os.path.exists('temp'):
+            os.makedirs('temp')
+
+        # Ses dosyasını kaydet
+        timestamp = int(time.time())
+        temp_path = f'temp/audio_{timestamp}_{random.randint(100000, 999999)}.webm'
+        audio_file.save(temp_path)
+        logger.info(f"WebM dosyası kaydedildi: {os.path.abspath(temp_path)}")
+
+        try:
+            # Ses dosyasını metne çevir
+            transcript = await current_interview.transcribe_audio(temp_path)
+            if not transcript:
+                logger.warning("Ses tanıma başarısız oldu")
+                return jsonify({
+                    'success': False,
+                    'error': 'Ses tanınamadı',
+                    'continue_listening': True  # Dinlemeye devam et
+                })
+
+            logger.info(f"Tanınan metin: {transcript}")
+
+            # GPT yanıtını al
+            gpt_response, is_interview_ended = await current_interview.get_gpt_response(transcript)
+            if not gpt_response:
+                logger.warning("GPT yanıtı alınamadı")
+                return jsonify({
+                    'success': False,
+                    'error': 'GPT yanıtı alınamadı',
+                    'continue_listening': True  # Dinlemeye devam et
+                })
+
+            logger.info(f"GPT yanıtı: {gpt_response}")
+            
+            # Mülakat bitiş kontrolü - get_gpt_response'tan gelen is_interview_ended değeri 
+            # veya yanıtta özel "MÜLAKAT_BİTTİ" işareti var mı?
+            interview_ended = is_interview_ended or "MÜLAKAT_BİTTİ" in gpt_response
+            
+            # Son soru olup olmadığını kontrol et
+            if current_interview.current_question_index >= len(current_interview.interview_questions) - 1:
+                # Son soru soruldu, mülakat bitiyor
+                interview_ended = True
+                logger.info("Son soru soruldu, mülakat bitiyor")
+            
+            # Eğer mülakat bittiyse, "MÜLAKAT_BİTTİ" cümlesini yanıttan çıkar
+            if "MÜLAKAT_BİTTİ" in gpt_response:
+                gpt_response = gpt_response.replace("MÜLAKAT_BİTTİ", "").strip()
+            
+            # İstemciye yanıt gönder
+            return jsonify({
+                'success': True,
+                'transcript': transcript,
+                'response': gpt_response,
+                'interview_ended': interview_ended
+            })
+            
+        except Exception as e:
+            logger.error(f"Ses işleme hatası: {str(e)}")
+            return jsonify({
+                'success': False,
+                'error': str(e),
+                'continue_listening': True  # Genel hata durumunda bile dinlemeye devam et
+            })
+
+        finally:
+            # Geçici dosyayı temizle
+            if os.path.exists(temp_path):
+                try:
+                    os.remove(temp_path)
+                    logger.info("Geçici ses dosyası silindi")
+                except Exception as e:
+                    logger.warning(f"Geçici dosya silme hatası: {str(e)}")
+
+    except Exception as e:
+        logger.error(f"Genel hata: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'continue_listening': True  # Genel hata durumunda bile dinlemeye devam et
+        })
+
+
+@app.route('/generate_report', methods=['POST'])
+async def generate_report():
+    try:
+        logging.info("Rapor oluşturma süreci başlatıldı...")
+        
+        # İstek verilerini al
+        data = request.get_json()
+        interview_code = data.get('interview_code')
+        conversation_history = data.get('conversation_history', [])
+        
+        if not interview_code:
+            return jsonify({'success': False, 'error': 'Mülakat kodu gerekli'}), 400
+            
+        # Mülakat dosyasını kontrol et
+        interview_file = f'interviews/{interview_code}.json'
+        if not os.path.exists(interview_file):
+            return jsonify({'success': False, 'error': 'Mülakat bulunamadı'}), 404
+            
+        # Mülakat verilerini oku
+        with open(interview_file, 'r', encoding='utf-8') as f:
+            interview_data = json.load(f)
+            
+        if not conversation_history:
+            return jsonify({'success': False, 'error': 'Konuşma geçmişi boş'}), 400
+            
+        # GPT değerlendirmesi için prompt hazırla
+        prompt = f"""
+        Aşağıdaki mülakat için detaylı bir değerlendirme raporu hazırla:
+        
+        Aday: {interview_data.get('candidate_name')}
+        Pozisyon: {interview_data.get('position')}
+        Tarih: {interview_data.get('created_at')}
+        
+        Mülakat Konuşma Akışı:
+        """
+        
+        # Konuşma akışını ekle
+        for message in conversation_history:
+            role = "Aday" if message['role'] == 'user' else "Mülakat Asistanı"
+            prompt += f"\n{role}: {message['content']}\n"
+            
+        prompt += """
+        Lütfen aşağıdaki kriterlere göre değerlendirme yap:
+        1. Teknik Yetkinlik (1-10)
+        2. İletişim Becerileri (1-10)
+        3. Problem Çözme (1-10)
+        4. Deneyim Seviyesi (1-10)
+        
+        Her kriter için detaylı açıklama ve örnekler ver.
+        Güçlü yönler ve gelişim alanlarını belirt.
+        Genel değerlendirme ve tavsiyeler ekle.
+        """
+        
+        # GPT'den değerlendirme al
+        client = OpenAI()
+        response = client.chat.completions.create(
+            model="gpt-4-turbo-preview",
+            messages=[{"role": "system", "content": "Sen bir mülakat değerlendirme uzmanısın."},
+                     {"role": "user", "content": prompt}],
+            temperature=0.7,
+            max_tokens=2000
+        )
+        
+        evaluation_text = response.choices[0].message.content
+        
+        # Skorları ve bölümleri çıkar
+        scores = {
+            'technical': extract_score(evaluation_text, 'Teknik Yetkinlik'),
+            'communication': extract_score(evaluation_text, 'İletişim Becerileri'),
+            'problem_solving': extract_score(evaluation_text, 'Problem Çözme'),
+            'experience': extract_score(evaluation_text, 'Deneyim Seviyesi')
+        }
+        
+        sections = {
+            'strengths': extract_section(evaluation_text, 'Güçlü Yönler'),
+            'improvements': extract_section(evaluation_text, 'Gelişim Alanları'),
+            'overall': extract_section(evaluation_text, 'Genel Değerlendirme')
+        }
+        
+        # Genel skoru hesapla
+        overall_score = calculate_overall_score(scores)
+        
+        # PDF rapor dosya adını oluştur
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        pdf_filename = f"report_{interview_code}_{timestamp}.pdf"
+        pdf_path = os.path.join('reports', pdf_filename)
+        
+        # PDF raporu oluştur
+        doc = SimpleDocTemplate(pdf_path, pagesize=letter)
+        styles = getSampleStyleSheet()
+        elements = []
+        
+        # Başlık
+        title_style = ParagraphStyle(
+            'CustomTitle',
+            parent=styles['Heading1'],
+            fontSize=24,
+            spaceAfter=30
+        )
+        elements.append(Paragraph(f"Mülakat Değerlendirme Raporu - {interview_data.get('candidate_name')}", title_style))
+        
+        # Temel Bilgiler
+        info_style = ParagraphStyle(
+            'Info',
+            parent=styles['Normal'],
+            fontSize=12,
+            spaceAfter=20
+        )
+        elements.append(Paragraph(f"Pozisyon: {interview_data.get('position')}", info_style))
+        elements.append(Paragraph(f"Tarih: {interview_data.get('created_at')}", info_style))
+        elements.append(Paragraph(f"Genel Skor: {overall_score}/10", info_style))
+        
+        # Skorlar
+        elements.append(Paragraph("Değerlendirme Skorları", styles['Heading2']))
+        for criterion, score in scores.items():
+            elements.append(Paragraph(f"{criterion.replace('_', ' ').title()}: {score}/10", info_style))
+        
+        # Bölümler
+        for section_title, content in sections.items():
+            elements.append(Paragraph(section_title.replace('_', ' ').title(), styles['Heading2']))
+            elements.append(Paragraph(content, info_style))
+        
+        # PDF'i oluştur
+        doc.build(elements)
+        
+        # Rapor URL'sini oluştur
+        report_url = url_for('serve_report', filename=pdf_filename, _external=True)
+        
+        return jsonify({
+            'success': True,
+            'report_url': report_url
+        })
+        
+    except Exception as e:
+        logging.error(f"Rapor oluşturma hatası: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+def extract_score(text, category):
+    """Metinden puan çıkarma"""
+    try:
+        pattern = f"{category}.*?(\\d+)"
+        match = re.search(pattern, text, re.DOTALL)
+        if match:
+            score = int(match.group(1))
+            return min(max(score, 0), 100)  # 0-100 arası sınırla
+    except:
+        pass
+    return 0
+
+def extract_section(text, section):
+    """Metinden bölüm çıkarma"""
+    try:
+        pattern = f"{section}:(.*?)(?=\n\n|$)"
+        match = re.search(pattern, text, re.DOTALL)
+        if match:
+            return match.group(1).strip()
+    except:
+        pass
+    return ""
+
+def calculate_overall_score(evaluation_data):
+    """Genel puanı hesapla"""
+    weights = {
+        "teknik_bilgi_ve_deneyim": 0.4,
+        "iletisim_becerileri": 0.2,
+        "problem_cozme": 0.2,
+        "ozguven_profesyonellik": 0.2
+    }
+    
+    total_score = 0
+    for key, weight in weights.items():
+        total_score += evaluation_data.get(key, 0) * weight
+        
+    return round(total_score, 1)
+
+@app.route('/check_audio_support', methods=['GET'])
+def check_audio_support():
+    """Desteklenen ses formatlarını kontrol et"""
+    try:
+        supported_formats = {
+            'webm': True,
+            'wav': True,
+            'mp3': True,
+            'ogg': True
+        }
+        return jsonify({
+            'success': True,
+            'supported_formats': supported_formats
+        })
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+# Veritabanı bağlantısı için yardımcı fonksiyon
+def get_db_connection():
+    try:
+        conn = sqlite3.connect('data/interview.db')
+        conn.row_factory = sqlite3.Row
+        return conn
+    except Exception as e:
+        logger.error(f"Veritabanı bağlantı hatası: {str(e)}")
+        raise
+
+def create_or_get_interview_code(email):
+    """Email adresine göre mülakat kodu oluştur veya var olanı getir"""
+    conn = get_db_connection()
+    try:
+        # Önce mevcut kodu kontrol et
+        cursor = conn.execute('SELECT code FROM interview_codes WHERE email = ?', (email,))
+        result = cursor.fetchone()
+        
+        if result:
+            return result['code']
+            
+        # Yeni kod oluştur
+        while True:
+            # Email'den benzersiz bir kod oluştur
+            hash_object = hashlib.md5(email.encode())
+            code = hash_object.hexdigest()[:6].upper()
+            
+            # Kodun benzersiz olduğunu kontrol et
+            cursor = conn.execute('SELECT code FROM interview_codes WHERE code = ?', (code,))
+            if not cursor.fetchone():
+                break
+        
+        # Yeni kodu kaydet
+        conn.execute(
+            'INSERT INTO interview_codes (email, code, created_at) VALUES (?, ?, ?)',
+            (email, code, datetime.now().isoformat())
+        )
+        conn.commit()
+        return code
+    finally:
+        conn.close()
+
+def save_interview_data(data, code):
+    """Mülakat verilerini JSON dosyası olarak kaydet"""
+    try:
+        # Veriyi yeni formata dönüştür
+        formatted_data = {
+            "code": code,
+            "candidate_name": data.get('adSoyad') or data.get('candidate_name'),
+            "position": data.get('isIlaniPozisyonu') or data.get('position'),
+            "questions": data.get('mulakatSorulari') or data.get('questions', [
+                "1. Yapay zekanın temel bileşenleri hakkında bilgi verebilir misiniz?",
+                "2. Belirli bir veri setinde overfitting problemini nasıl tanımlar ve çözersiniz?",
+                "3. Günlük çalışmalarınızda hangi yapay zeka frameworklerini kullandınız?",
+                "4. Çeşitli regresyon teknikleri hakkında bilgi verebilir misiniz?",
+                "5. NLP konusunda ne gibi deneyimleriniz var?"
+            ]),
+            "status": data.get('status', 'pending'),
+            "created_at": data.get('created_at', datetime.now().isoformat()),
+            "updated_at": data.get('updated_at', datetime.now().isoformat())
+        }
+        
+        file_path = os.path.join('interviews', f'{code}.json')
+        with open(file_path, 'w', encoding='utf-8') as f:
+            json.dump(formatted_data, f, ensure_ascii=False, indent=2)
+            
+        logger.info(f"Mülakat verisi kaydedildi: {code}")
+        return file_path
+    except Exception as e:
+        logger.error(f"JSON kaydetme hatası: {str(e)}")
+        return None
+
+def send_webhook_notification(webhook_url, data):
+    """Webhook'a bildirim gönder"""
+    try:
+        response = requests.post(
+            webhook_url,
+            json=data,
+            headers={'Content-Type': 'application/json'}
+        )
+        return response.status_code == 200
+    except Exception as e:
+        logger.error(f"Webhook gönderme hatası: {str(e)}")
+        return False
+
+@app.route('/webhook/interview', methods=['POST'])
+def webhook_aday_handler():
+    try:
+        data = request.json
+        if not data:
+            return jsonify({"error": "Veri bulunamadı"}), 400
+
+        # Gerekli alanları kontrol et
+        required_fields = ['adSoyad', 'isIlaniPozisyonu']
+        for field in required_fields:
+            if field not in data:
+                return jsonify({"error": f"Eksik alan: {field}"}), 400
+
+        # Mülakat kodu oluştur
+        interview_code = generate_interview_code()
+        
+        # Webhook URL'lerini al
+        webhook_aday_url = data.get('webhook_aday_url', WEBHOOK_ADAY_URL)
+        webhook_rapor_url = data.get('webhook_rapor_url', WEBHOOK_RAPOR_URL)
+        
+        # JSON dosyasını oluştur
+        interview_data = {
+            "code": interview_code,
+            "candidate_name": data.get("adSoyad"),
+            "position": data.get("isIlaniPozisyonu"),
+            "requirements": data.get("isIlaniGereksinimleri", []),
+            "questions": data.get("mulakatSorulari", []),
+            "created_at": datetime.now().isoformat(),
+            "status": "pending",
+            "webhook_aday_url": webhook_aday_url,
+            "webhook_rapor_url": webhook_rapor_url
+        }
+        
+        # JSON dosyasını kaydet
+        json_path = os.path.join('interviews', f'{interview_code}.json')
+        with open(json_path, 'w', encoding='utf-8') as f:
+            json.dump(interview_data, f, ensure_ascii=False, indent=2)
+        
+        # WebhookAdayİşlem'e yanıt gönder
+        response_data = {
+            "success": True,
+            "interview_code": interview_code,
+            "interview_url": f"{request.host_url}interview?code={interview_code}",
+            "expires_at": (datetime.now() + timedelta(hours=24)).isoformat()
+        }
+        
+        # Webhook'a bildirim gönder
+        try:
+            if webhook_aday_url:
+                webhook_response = requests.post(
+                    webhook_aday_url,
+                    json=response_data,
+                    headers={'Content-Type': 'application/json'},
+                    timeout=5  # 5 saniye timeout
+                )
+                logger.info(f"WebhookAdayİşlem yanıtı: {webhook_response.status_code}")
+        except requests.exceptions.RequestException as e:
+            logger.error(f"WebhookAdayİşlem gönderme hatası: {str(e)}")
+            # Webhook hatası olsa bile işleme devam et
+
+        return jsonify(response_data)
+
+    except Exception as e:
+        logger.error(f"Webhook alım hatası: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+def send_report_webhook(pdf_path, evaluation_data):
+    """Raporu webhook'a gönder"""
+    try:
+        # PDF dosyasını Base64'e çevir
+        with open(pdf_path, 'rb') as pdf_file:
+            pdf_base64 = base64.b64encode(pdf_file.read()).decode('utf-8')
+        
+        # Mülakat verilerini hazırla
+        interview_summary = {
+            "mulakat_kodu": current_interview.code,
+            "aday_bilgileri": {
+                "isim": current_interview.candidate_name,
+                "pozisyon": current_interview.position,
+                "cv_ozeti": current_interview.cv_summary,
+                "on_bilgi": current_interview.pre_info,
+                "gereksinimler": current_interview.requirements,
+                "tarih": current_interview.start_time.isoformat()
+            },
+            "mulakat_metrikleri": {
+                "iletisim_puani": current_interview.metrics["iletisim_puani"],
+                "ozguven_puani": current_interview.metrics["ozguven_puani"],
+                "teknik_bilgi": current_interview.metrics["teknik_bilgi"],
+                "genel_puan": current_interview.metrics["genel_puan"]
+            },
+            "degerlendirme": evaluation_data,
+            "konusma_akisi": current_interview.conversation_history,
+            "pdf_base64": pdf_base64,  # PDF dosyası yerine Base64 formatında gönderme
+            "pdf_dosya_adi": os.path.basename(pdf_path),
+            "olusturulma_tarihi": datetime.now().isoformat()
+        }
+        
+        # JSON dosyasından webhook URL'sini kontrol et
+        json_path = os.path.join('interviews', f'{current_interview.code}.json')
+        webhook_url = WEBHOOK_RAPOR_URL  # Varsayılan URL
+        
+        if os.path.exists(json_path):
+            with open(json_path, 'r', encoding='utf-8') as f:
+                interview_json = json.load(f)
+                if 'webhook_rapor_url' in interview_json:
+                    webhook_url = interview_json['webhook_rapor_url']
+                    logger.info(f"JSON'dan webhook URL'si kullanılıyor: {webhook_url}")
+                else:
+                    logger.info(f"Varsayılan webhook URL'si kullanılıyor: {webhook_url}")
+        
+        # WebhookRapor'a gönder
+        response = requests.post(
+            webhook_url,
+            json=interview_summary,
+            headers={
+                'Content-Type': 'application/json',
+                'X-Interview-Code': current_interview.code
+            }
+        )
+        
+        if response.status_code == 200:
+            logger.info(f"Rapor webhook'a başarıyla gönderildi: {current_interview.code}")
+            return True
+        else:
+            logger.error(f"Webhook hatası: {response.status_code} - {response.text}")
+            return False
+                
+    except Exception as e:
+        logger.error(f"Webhook gönderme hatası: {str(e)}")
+        return False
+
+@app.route('/reports/<path:filename>')
+def serve_report(filename):
+    """Rapor dosyalarını sun"""
+    try:
+        return send_from_directory('reports', filename)
     except Exception as e:
         logger.error(f"Rapor sunma hatası: {str(e)}")
-        return 'Rapor sunulurken bir hata oluştu', 500
-
+        return "Rapor bulunamadı", 404
+    
+    
 def start_file_watcher():
     """Dosya izleme sistemini başlat - Sadece terminal log'ları için"""
     try:
@@ -935,6 +1797,12 @@ async def generate_interview_report(interview_code, interview_data):
             "gelisim_alanlari": interview_data.get('gelisim_alanlari', [])
         }
         
+        # PDF dosyası varsa Base64'e çevir
+        pdf_base64 = None
+        if os.path.exists(pdf_path):
+            with open(pdf_path, 'rb') as pdf_file:
+                pdf_base64 = base64.b64encode(pdf_file.read()).decode('utf-8')
+        
         # Webhook'a gönderilecek veriyi hazırla
         webhook_data = {
             "mulakat_kodu": interview_code,
@@ -944,7 +1812,8 @@ async def generate_interview_report(interview_code, interview_data):
                 "tarih": datetime.now().isoformat()
             },
             "degerlendirme": evaluation_data,
-            "rapor_dosyasi": pdf_path
+            "pdf_base64": pdf_base64,
+            "pdf_dosya_adi": os.path.basename(pdf_path)
         }
         
         # Webhook'a gönder
@@ -1154,239 +2023,6 @@ async def get_speech():
             'success': False,
             'error': str(e)
         }), 500
-
-@app.route('/generate_report', methods=['POST'])
-async def generate_report():
-    try:
-        logging.info("Rapor oluşturma süreci başlatıldı...")
-        
-        # İstek verilerini al
-        data = request.get_json()
-        interview_code = data.get('interview_code')
-        conversation_history = data.get('conversation_history', [])
-        
-        if not interview_code:
-            return jsonify({'success': False, 'error': 'Mülakat kodu gerekli'}), 400
-            
-        # Mülakat dosyasını kontrol et
-        interview_file = f'interviews/{interview_code}.json'
-        if not os.path.exists(interview_file):
-            return jsonify({'success': False, 'error': 'Mülakat bulunamadı'}), 404
-            
-        # Mülakat verilerini oku
-        with open(interview_file, 'r', encoding='utf-8') as f:
-            interview_data = json.load(f)
-            
-        if not conversation_history:
-            return jsonify({'success': False, 'error': 'Konuşma geçmişi boş'}), 400
-            
-        # GPT değerlendirmesi için prompt hazırla
-        prompt = f"""
-        Aşağıdaki mülakat için detaylı bir değerlendirme raporu hazırla:
-        
-        Aday: {interview_data.get('candidate_name')}
-        Pozisyon: {interview_data.get('position')}
-        Tarih: {interview_data.get('created_at')}
-        
-        Mülakat Konuşma Akışı:
-        """
-        
-        # Konuşma akışını ekle
-        for message in conversation_history:
-            role = "Aday" if message['role'] == 'user' else "Mülakat Asistanı"
-            prompt += f"\n{role}: {message['content']}\n"
-            
-        prompt += """
-        Lütfen aşağıdaki kriterlere göre değerlendirme yap:
-        1. Teknik Yetkinlik (1-10)
-        2. İletişim Becerileri (1-10)
-        3. Problem Çözme (1-10)
-        4. Deneyim Seviyesi (1-10)
-        
-        Her kriter için detaylı açıklama ve örnekler ver.
-        Güçlü yönler ve gelişim alanlarını belirt.
-        Genel değerlendirme ve tavsiyeler ekle.
-        """
-        
-        # GPT'den değerlendirme al
-        client = OpenAI()
-        response = client.chat.completions.create(
-            model="gpt-4-turbo-preview",
-            messages=[{"role": "system", "content": "Sen bir mülakat değerlendirme uzmanısın."},
-                     {"role": "user", "content": prompt}],
-            temperature=0.7,
-            max_tokens=2000
-        )
-        
-        evaluation_text = response.choices[0].message.content
-        
-        # Skorları ve bölümleri çıkar
-        scores = {
-            'technical': extract_score(evaluation_text, 'Teknik Yetkinlik'),
-            'communication': extract_score(evaluation_text, 'İletişim Becerileri'),
-            'problem_solving': extract_score(evaluation_text, 'Problem Çözme'),
-            'experience': extract_score(evaluation_text, 'Deneyim Seviyesi')
-        }
-        
-        sections = {
-            'strengths': extract_section(evaluation_text, 'Güçlü Yönler'),
-            'improvements': extract_section(evaluation_text, 'Gelişim Alanları'),
-            'overall': extract_section(evaluation_text, 'Genel Değerlendirme')
-        }
-        
-        # Genel skoru hesapla
-        overall_score = calculate_overall_score(scores)
-        
-        # PDF rapor dosya adını oluştur - mülakat kodu ile isimlendirme
-        pdf_filename = f"{interview_code}_report.pdf"
-        pdf_path = os.path.join('reports', pdf_filename)
-        
-        # PDF raporu oluştur
-        os.makedirs('reports', exist_ok=True)  # reports klasörünün varlığından emin ol
-        doc = SimpleDocTemplate(pdf_path, pagesize=letter)
-        styles = getSampleStyleSheet()
-        elements = []
-        
-        # Başlık
-        title_style = ParagraphStyle(
-            'CustomTitle',
-            parent=styles['Heading1'],
-            fontSize=24,
-            spaceAfter=30
-        )
-        elements.append(Paragraph(f"Mülakat Değerlendirme Raporu - {interview_data.get('candidate_name')}", title_style))
-        
-        # Temel Bilgiler
-        info_style = ParagraphStyle(
-            'Info',
-            parent=styles['Normal'],
-            fontSize=12,
-            spaceAfter=20
-        )
-        elements.append(Paragraph(f"Pozisyon: {interview_data.get('position')}", info_style))
-        elements.append(Paragraph(f"Tarih: {interview_data.get('created_at')}", info_style))
-        elements.append(Paragraph(f"Genel Skor: {overall_score}/10", info_style))
-        
-        # Skorlar
-        elements.append(Paragraph("Değerlendirme Skorları", styles['Heading2']))
-        for criterion, score in scores.items():
-            elements.append(Paragraph(f"{criterion.replace('_', ' ').title()}: {score}/10", info_style))
-        
-        # Bölümler
-        for section_title, content in sections.items():
-            elements.append(Paragraph(section_title.replace('_', ' ').title(), styles['Heading2']))
-            elements.append(Paragraph(content, info_style))
-        
-        # PDF'i oluştur
-        doc.build(elements)
-        
-        # PDF içeriğini base64 ile kodla
-        with open(pdf_path, "rb") as pdf_file:
-            pdf_content_base64 = base64.b64encode(pdf_file.read()).decode('utf-8')
-        
-        # Rapor URL'sini oluştur
-        report_url = url_for('serve_report', filename=pdf_filename, _external=True)
-        
-        # Rapor bilgilerini JSON dosyasına ekle
-        interview_data['report'] = {
-            'url': report_url,
-            'pdf_base64': pdf_content_base64,
-            'created_at': datetime.now().isoformat(),
-            'filename': pdf_filename
-        }
-        
-        # Güncellenmiş mülakat verilerini kaydet
-        with open(interview_file, 'w', encoding='utf-8') as f:
-            json.dump(interview_data, f, ensure_ascii=False, indent=2)
-        
-        # Webhook'a gönder
-        try:
-            send_report_webhook(pdf_path, evaluation_text, pdf_content_base64)
-        except Exception as e:
-            logging.error(f"Webhook gönderme hatası: {str(e)}")
-            # Webhook hatası olsa bile işlem devam edecek
-        
-        return jsonify({
-            'success': True,
-            'report_url': report_url,
-            'pdf_included': True
-        })
-        
-    except Exception as e:
-        logging.error(f"Rapor oluşturma hatası: {str(e)}")
-        return jsonify({
-            'success': False,
-            'error': str(e)
-        }), 500
-
-def send_report_webhook(pdf_path, evaluation_data, pdf_content_base64=None):
-    """Raporu webhook'a gönder"""
-    try:
-        # PDF dosya adını URL'ye dönüştür
-        pdf_filename = os.path.basename(pdf_path)
-        report_url = url_for('serve_report', filename=pdf_filename, _external=True)
-        
-        # PDF içeriğini base64 ile kodla (eğer parametre olarak gelmemişse)
-        if pdf_content_base64 is None:
-            with open(pdf_path, "rb") as pdf_file:
-                pdf_content_base64 = base64.b64encode(pdf_file.read()).decode('utf-8')
-        
-        # Mülakat verilerini hazırla
-        interview_summary = {
-            "mulakat_kodu": current_interview.code,
-            "aday_bilgileri": {
-                "isim": current_interview.candidate_name,
-                "pozisyon": current_interview.position,
-                "cv_ozeti": current_interview.cv_summary,
-                "on_bilgi": current_interview.pre_info,
-                "gereksinimler": current_interview.requirements,
-                "tarih": current_interview.start_time.isoformat()
-            },
-            "mulakat_metrikleri": {
-                "iletisim_puani": current_interview.metrics["iletisim_puani"],
-                "ozguven_puani": current_interview.metrics["ozguven_puani"],
-                "teknik_bilgi": current_interview.metrics["teknik_bilgi"],
-                "genel_puan": current_interview.metrics["genel_puan"]
-            },
-            "degerlendirme": evaluation_data,
-            "konusma_akisi": current_interview.conversation_history,
-            "rapor_url": report_url,  # PDF URL'si
-            "rapor_pdf_base64": pdf_content_base64,  # PDF içeriği base64 olarak
-            "olusturulma_tarihi": datetime.now().isoformat()
-        }
-        
-        # JSON dosyasından webhook URL'sini kontrol et
-        json_path = os.path.join('interviews', f'{current_interview.code}.json')
-        webhook_url = WEBHOOK_RAPOR_URL  # Varsayılan URL
-        
-        if os.path.exists(json_path):
-            with open(json_path, 'r', encoding='utf-8') as f:
-                interview_json = json.load(f)
-                if 'webhook_rapor_url' in interview_json:
-                    webhook_url = interview_json['webhook_rapor_url']
-                    logger.info(f"JSON'dan webhook URL'si kullanılıyor: {webhook_url}")
-                else:
-                    logger.info(f"Varsayılan webhook URL'si kullanılıyor: {webhook_url}")
-        
-        # WebhookRapor'a gönder
-        response = requests.post(
-            webhook_url,
-            json=interview_summary,
-            headers={
-                'Content-Type': 'application/json',
-                'X-Interview-Code': current_interview.code
-            }
-        )
-        
-        if response.status_code == 200:
-            logger.info(f"Rapor webhook'a başarıyla gönderildi: {current_interview.code}")
-            return True
-        else:
-            logger.error(f"Rapor webhook'a gönderilemedi: {response.status_code} - {response.text}")
-            return False
-    except Exception as e:
-        logger.error(f"Webhook gönderme hatası: {str(e)}")
-        return False
 
 if __name__ == '__main__':
     try:
