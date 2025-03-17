@@ -798,6 +798,9 @@
         let photoInterval = null;
         let lastPhotoTime = 0;
         let photoCounter = 0;
+        // Global değişkenler
+        let audioQueue = [];
+        let isProcessingAudioQueue = false;
 
         // WebSocket yerine SSE kullanımı
         async function initializeRealtimeSession() {
@@ -1230,12 +1233,41 @@
 
         async function speakResponse(text) {
             try {
+                // Ses isteğini kuyruğa ekle
+                return new Promise((resolve) => {
+                    audioQueue.push({ text, callback: resolve });
+                    
+                    // Kuyruk işlenmiyorsa başlat
+                    if (!isProcessingAudioQueue) {
+                        processAudioQueue();
+                    }
+                });
+            } catch (error) {
+                console.error('TTS hatası:', error);
+                isSpeaking = false;
+                isGPTSpeaking = false;
+                updateStatus('Ses oluşturma hatası', 'error');
+                updateAvatarState('idle');
+            }
+        }
+
+        // Ses kuyruğunu işleme
+        async function processAudioQueue() {
+            if (audioQueue.length === 0) {
+                isProcessingAudioQueue = false;
+                return;
+            }
+            
+            isProcessingAudioQueue = true;
+            const audioItem = audioQueue.shift();
+            
+            try {
                 // Ses dosyası için benzersiz isim oluştur
                 const timestamp = new Date().getTime();
                 const random = Math.floor(Math.random() * 1000000);
                 
                 // OpenAI TTS isteği gönder
-                const response = await fetch('/get_speech?text=' + encodeURIComponent(text), {
+                const response = await fetch('/get_speech?text=' + encodeURIComponent(audioItem.text), {
                     method: 'GET'
                 });
 
@@ -1248,51 +1280,64 @@
                 const audioUrl = URL.createObjectURL(audioBlob);
                 const audio = new Audio(audioUrl);
 
-                return new Promise((resolve) => {
-                    audio.onplay = () => {
-                        console.log('GPT konuşmaya başladı');
-                        isSpeaking = true;
-                        isGPTSpeaking = true;
-                        updateStatus('GPT yanıt veriyor...', 'speaking');
-                        updateAvatarState('speaking');
-                    };
+                audio.onplay = () => {
+                    console.log('GPT konuşmaya başladı');
+                    isSpeaking = true;
+                    isGPTSpeaking = true;
+                    updateStatus('GPT yanıt veriyor...', 'speaking');
+                    updateAvatarState('speaking');
+                };
 
-                    audio.onended = async () => {
-                        console.log('GPT konuşması bitti');
-                        URL.revokeObjectURL(audioUrl);
-                        isSpeaking = false;
-                        isGPTSpeaking = false;
+                audio.onended = async () => {
+                    console.log('GPT konuşması bitti');
+                    URL.revokeObjectURL(audioUrl);
+                    isSpeaking = false;
+                    isGPTSpeaking = false;
 
-                        // Manuel mod aktif olduğu için manuel mod mesajını göster
-                        updateStatus('Space tuşuna basılı tutarak konuşun', 'manual');
-                        updateAvatarState('idle');
-                        await initAudio();
+                    // Manuel mod aktif olduğu için manuel mod mesajını göster
+                    updateStatus('Space tuşuna basılı tutarak konuşun', 'manual');
+                    updateAvatarState('idle');
+                    await initAudio();
 
-                        resolve();
-                    };
+                    // Callback çağır
+                    audioItem.callback();
+                    
+                    // Sıradaki sesi işle
+                    setTimeout(() => {
+                        processAudioQueue();
+                    }, 300); // Sesler arasında biraz boşluk bırak
+                };
 
-                    audio.onerror = (error) => {
-                        console.error('Ses oynatma hatası:', error);
-                        URL.revokeObjectURL(audioUrl);
-                        isSpeaking = false;
-                        isGPTSpeaking = false;
-                        updateStatus('Ses oynatma hatası', 'error');
-                        updateAvatarState('idle');
-                        resolve();
-                    };
+                audio.onerror = (error) => {
+                    console.error('Ses oynatma hatası:', error);
+                    URL.revokeObjectURL(audioUrl);
+                    isSpeaking = false;
+                    isGPTSpeaking = false;
+                    updateStatus('Ses oynatma hatası', 'error');
+                    updateAvatarState('idle');
+                    audioItem.callback();
+                    
+                    // Sıradaki sesi işle
+                    setTimeout(() => {
+                        processAudioQueue();
+                    }, 300);
+                };
 
-                    audio.play().catch((error) => {
-                        console.error('Ses oynatma başlatma hatası:', error);
-                        URL.revokeObjectURL(audioUrl);
-                        resolve();
-                    });
+                // Ses dosyasını oynat
+                await audio.play().catch((error) => {
+                    console.error('Ses oynatma başlatma hatası:', error);
+                    URL.revokeObjectURL(audioUrl);
+                    audioItem.callback();
+                    processAudioQueue();
                 });
             } catch (error) {
-                console.error('TTS hatası:', error);
-                isSpeaking = false;
-                isGPTSpeaking = false;
-                updateStatus('Ses oluşturma hatası', 'error');
-                updateAvatarState('idle');
+                console.error('Ses işleme hatası:', error);
+                audioItem.callback();
+                
+                // Sıradaki sesi işle
+                setTimeout(() => {
+                    processAudioQueue();
+                }, 300);
             }
         }
 
