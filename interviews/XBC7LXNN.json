@@ -1,0 +1,74 @@
+{
+  "code": "XBC7LXNN",
+  "candidate_name": "Süleyman Kaplan",
+  "position": "CEO",
+  "requirements": [],
+  "questions": [
+    "- \"Merhaba Süleyman Bey, hoş geldiniz. İlk olarak sizden, bugüne kadarki deneyimleriniz ve başarılarınız hakkında biraz bilgi alabilir miyim?\"",
+    "- \"Bu CEO pozisyonuna başvurma kararınızı etkileyen belirleyici faktörler neler oldu?\"",
+    "- \"Önceden karşılaştığınız ve çözmekte zorlandığınız bir problemi ve bu problemi nasıl çözdüğünüzü anlatır mısınız?\"",
+    "- \"Bir takım lideri olarak, farklı karakter ve yeteneklere sahip kişilerle nasıl başa çıktığınızı ve onları nasıl yönettiğinizi paylaşabilir misiniz?\"",
+    "- \"Son olarak, bir şirketin başında olmanın getirdiği zorluklar ve sorumluluklar konusunda neler düşündüğünüzü merak ediyorum.\""
+  ],
+  "created_at": "2025-03-17T14:22:18.018959",
+  "status": "completed",
+  "started_at": "2025-03-17T14:22:55.417543",
+  "photos": [
+    {
+      "filename": "20250317142301.jpg",
+      "timestamp": "2025-03-17T11:23:01.813Z",
+      "path": "XBC7LXNN_photos/20250317142301.jpg"
+    },
+    {
+      "filename": "20250317142321.jpg",
+      "timestamp": "2025-03-17T11:23:21.812Z",
+      "path": "XBC7LXNN_photos/20250317142321.jpg"
+    },
+    {
+      "filename": "20250317142346.jpg",
+      "timestamp": "2025-03-17T11:23:46.814Z",
+      "path": "XBC7LXNN_photos/20250317142346.jpg"
+    }
+  ],
+  "ended_at": "2025-03-17T14:23:58.894424",
+  "conversation_history": [
+    {
+      "role": "assistant",
+      "content": "Merhaba, mülakata başlamak için 'Başlayalım' yazabilir veya sesli olarak 'Başlayalım' diyebilirsiniz. Mülakata başlamak için sistem bu kelimeyi duymalıdır."
+    },
+    {
+      "role": "user",
+      "content": "Başlayalım."
+    },
+    {
+      "role": "assistant",
+      "content": "Merhaba Süleyman Kaplan, CEO pozisyonu için mülakatımıza hoş geldiniz.\n\nÖzgeçmişinizde belirttiğiniz bilgilere dayanarak, pozisyonun gerektirdiği yetkinlikler hakkında konuşacağız.\n\nİlk olarak, - \"Merhaba Süleyman Bey, hoş geldiniz. İlk olarak sizden, bugüne kadarki deneyimleriniz ve başarılarınız hakkında biraz bilgi alabilir miyim?\""
+    },
+    {
+      "role": "user",
+      "content": "Allah razı olsun."
+    },
+    {
+      "role": "assistant",
+      "content": "Bu konuyu biraz daha açar mısınız?"
+    }
+  ],
+  "report_path": "reports/mulakat_raporu_XBC7LXNN_20250317_142437.pdf",
+  "report_url": "/reports/mulakat_raporu_XBC7LXNN_20250317_142437.pdf",
+  "evaluation_data": {
+    "scores": {
+      "technical": 2,
+      "communication": 2,
+      "problem_solving": 1,
+      "experience": 1,
+      "cultural_fit": 2
+    },
+    "sections": {
+      "strengths": "",
+      "improvements": "",
+      "overall": "",
+      "hiring_recommendation": ""
+    },
+    "overall_score": 0.0
+  }
+}

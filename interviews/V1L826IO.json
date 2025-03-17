@@ -1,0 +1,38 @@
+{
+  "code": "V1L826IO",
+  "candidate_name": "süleyman kaplan",
+  "position": "ceo",
+  "requirements": [],
+  "questions": [
+    "- Merhaba Süleyman Bey. Kendinizden ve bugüne kadar tecrübe ettiğiniz profesyonel yolculuktan bahseder misiniz?",
+    "- CEO pozisyonu için başvurunuzun ardında yatan temel motivasyonunuz nedir? Bu pozisyonu neden istediğinizi anlatır mısınız?",
+    "- Geçmiş deneyimlerinizden hareketle, bir işletmenin stratejik yönünü belirleme ve uygulama konusunda ne tür deneyimleriniz oldu? Biraz detay verebilir misiniz?",
+    "- Bir CEO olarak karşılaşabileceğiniz karmaşık bir problemi çözümlemek için hangi adımları takip edersiniz? Önceki deneyimlerinizden bir örnek verir misiniz?",
+    "- Takımla çalışma ve iletişim kurma konusunda nasıl bir yaklaşımınız var? Bir lider olarak ekibinizi nasıl motive eder ve yönlendirirsiniz?"
+  ],
+  "created_at": "2025-03-17T13:55:35.965089",
+  "status": "active",
+  "started_at": "2025-03-17T14:01:40.092893",
+  "photos": [
+    {
+      "filename": "20250317140146.jpg",
+      "timestamp": "2025-03-17T11:01:46.495Z",
+      "path": "V1L826IO_photos/20250317140146.jpg"
+    },
+    {
+      "filename": "20250317140211.jpg",
+      "timestamp": "2025-03-17T11:02:11.493Z",
+      "path": "V1L826IO_photos/20250317140211.jpg"
+    },
+    {
+      "filename": "20250317140226.jpg",
+      "timestamp": "2025-03-17T11:02:26.495Z",
+      "path": "V1L826IO_photos/20250317140226.jpg"
+    },
+    {
+      "filename": "20250317140241.jpg",
+      "timestamp": "2025-03-17T11:02:41.495Z",
+      "path": "V1L826IO_photos/20250317140241.jpg"
+    }
+  ]
+}

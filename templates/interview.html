@@ -897,6 +897,18 @@
                     await endInterview();
                 }
             });
+
+            // Sayfa kapatılma olayını dinle
+            window.addEventListener('beforeunload', function(e) {
+                // Mülakat tamamlanmamışsa
+                if (!interviewEnded && modeButton.style.display === 'none') {
+                    // Rapor oluşturma isteğini gönder
+                    navigator.sendBeacon('/auto_generate_report', JSON.stringify({
+                        interview_code: interviewCode,
+                        conversation_history: chatHistory
+                    }));
+                }
+            });
         });
 
         // Ses kaydını işleme fonksiyonunu güncelle
@@ -1660,82 +1672,104 @@
             }, 3000);
         }
 
+        // Mülakat kapatıldığında veya sayfa yenilendiğinde rapor oluştur
+        let isClosing = false;
+        let reportSent = false;
+
+        // Mülakat bitirme fonksiyonu
         async function endInterview() {
-            if (interviewEnded) return;
-            
             try {
-                updateStatus('Mülakat sonlandırılıyor...', 'processing');
-                
-                // Tüm kaynakları temizle
-                if (isRecording) {
-                    await stopRecording();
+                // Zaten rapor gönderildiyse tekrar gönderme
+                if (reportSent) {
+                    return;
                 }
                 
-                // Kamerayı kapat
-                stopCamera();
+                // Rapor gönderildiğini işaretle
+                reportSent = true;
                 
-                // Mülakatı sonlandır
-                interviewEnded = true;
+                // UI güncellemesi
+                updateStatus('Rapor oluşturuluyor...', 'processing');
                 
-                // Mod butonlarını gizle
-                document.getElementById('manualModeButton').style.display = 'none';
-                document.getElementById('autoModeButton').style.display = 'none';
-                document.getElementById('endInterviewButton').style.display = 'none';
+                // Kamera ve ses kaydını durdur
+                if (cameraActive) {
+                    stopCamera();
+                }
                 
-                // Mülakat durumunu kaydet
-                await fetch('/save_interview_state', {
+                if (isRecording) {
+                    stopRecording();
+                }
+                
+                // Sunucuya mülakatı bitir bildirimi gönder
+                const response = await fetch('/end_interview', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
                     },
                     body: JSON.stringify({
                         code: interviewCode,
-                        conversation_history: chatHistory,
-                        ended: true
+                        conversation_history: chatHistory
                     })
                 });
                 
-                // Son mesajı kontrol et
-                let lastMessage = '';
-                if (chatHistory.length > 0) {
-                    lastMessage = chatHistory[chatHistory.length - 1].content || '';
-                }
-                
-                // Tamamlanma mesajını göster
-                addMessageToChat('assistant', 'Mülakat tamamlandı. Teşekkür ederiz. Raporunuz oluşturuluyor...');
-                await speakResponse('Mülakat tamamlandı. Teşekkür ederiz. Raporunuz oluşturuluyor...');
+                console.log("Mülakat bitirildi, rapor oluşturuluyor...");
                 
                 // Rapor oluştur
-                const reportResult = await generateReport();
+                const reportResponse = await fetch('/generate_report', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        interview_code: interviewCode,
+                        conversation_history: chatHistory
+                    })
+                });
                 
-                updateStatus('Mülakat tamamlandı', 'completed');
-                document.getElementById('aivaAvatar').classList.add('completed');
-                
-                // Sonuç mesajını göster
-                const resultContainer = document.createElement('div');
-                resultContainer.className = 'flex items-center justify-center my-8';
-                resultContainer.innerHTML = `
-                    <div class="bg-green-50 border border-green-200 rounded-lg p-6 text-center max-w-lg">
-                        <div class="text-green-600 text-5xl mb-4">
-                            <i class="fas fa-check-circle"></i>
-                        </div>
-                        <h2 class="text-xl font-bold text-green-800 mb-2">Mülakat Tamamlandı!</h2>
-                        <p class="text-green-700 mb-4">Rapor başarıyla oluşturuldu.</p>
-                        <a href="/reports/${interviewCode}_report.pdf" target="_blank" 
-                           class="inline-block bg-gradient-to-r from-green-500 to-green-600 
-                                  hover:from-green-600 hover:to-green-700 text-white 
-                                  font-medium py-2 px-6 rounded-lg transition-all duration-300">
-                            <i class="fas fa-file-pdf mr-2"></i>Raporu İndir
-                        </a>
-                    </div>
-                `;
-                document.getElementById('messages').appendChild(resultContainer);
-                
+                const reportData = await reportResponse.json();
+                if (reportData.success && reportData.report_url) {
+                    // Mülakatın bittiğini işaretle
+                    interviewEnded = true;
+                    
+                    // Rapor indirme butonunu ekle
+                    addDownloadButton(reportData.report_url);
+                    showSuccess('Mülakat tamamlandı ve rapor oluşturuldu!');
+                    
+                    // Tamamlanma mesajı göster
+                    addMessageToChat('assistant', 'Mülakat tamamlandı. Teşekkür ederiz. Raporunuz hazır.');
+                } else {
+                    showError('Rapor oluşturulurken bir hata oluştu: ' + (reportData.error || 'Bilinmeyen hata'));
+                }
             } catch (error) {
                 console.error('Mülakat bitirme hatası:', error);
-                showError('Mülakat sonlandırılırken bir hata oluştu: ' + error.message);
+                showError('Mülakat sonlandırılırken bir hata oluştu');
             }
         }
+
+        // Sayfa kapatıldığında otomatik rapor oluştur
+        window.addEventListener('beforeunload', function(e) {
+            // Eğer mülakat başladıysa ve henüz bitmemişse ve rapor gönderilmemişse
+            if (!interviewEnded && !reportSent && modeButton.style.display === 'none') {
+                // Kapatmayı işaretle
+                isClosing = true;
+                
+                try {
+                    // Senkron AJAX isteği (beacon'dan daha güvenilir)
+                    const xhr = new XMLHttpRequest();
+                    xhr.open('POST', '/auto_generate_report', false); // 3. parametre: senkron istek
+                    xhr.setRequestHeader('Content-Type', 'application/json');
+                    xhr.send(JSON.stringify({
+                        interview_code: interviewCode,
+                        conversation_history: chatHistory
+                    }));
+                    console.log("Otomatik rapor isteği gönderildi");
+                    
+                    // Rapor gönderildiğini işaretle
+                    reportSent = true;
+                } catch (error) {
+                    console.error("Otomatik rapor oluşturma hatası:", error);
+                }
+            }
+        });
 
         async function generateReport() {
             try {
@@ -1777,6 +1811,17 @@
             
             setTimeout(() => {
                 successDiv.remove();
+            }, 5000);
+        }
+
+        function showInfo(message) {
+            const infoDiv = document.createElement('div');
+            infoDiv.className = 'fixed top-4 right-4 bg-blue-500 text-white px-6 py-3 rounded-lg shadow-lg z-50';
+            infoDiv.textContent = message;
+            document.body.appendChild(infoDiv);
+            
+            setTimeout(() => {
+                infoDiv.remove();
             }, 5000);
         }
 
@@ -2046,6 +2091,60 @@
                     updateStatus('Manuel mod aktif - Space tuşuna basılı tutarak konuşun', 'manual');
                     updateAvatarState('idle');
                     
+                    // Başlayalım butonu
+                    const startContainer = document.createElement('div');
+                    startContainer.className = 'fixed bottom-24 right-4 flex gap-4';
+                    startContainer.id = 'startButtonContainer';
+                    
+                    const startButton = document.createElement('button');
+                    startButton.className = 'bg-green-600 text-white px-6 py-3 rounded-lg shadow-lg hover:bg-green-700 transition-colors';
+                    startButton.id = 'startInterviewButton';
+                    startButton.innerHTML = '<i class="fas fa-play mr-2"></i>Başlayalım';
+                    startButton.onclick = async () => {
+                        // Başlayalım mesajını doğrudan gönder
+                        addMessageToChat('user', 'Başlayalım');
+                        
+                        // Yanıt al
+                        try {
+                            updateStatus('İşleniyor...', 'processing');
+                            updateAvatarState('processing');
+                            
+                            const response = await fetch('/process_audio', {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json'
+                                },
+                                body: JSON.stringify({
+                                    transcript: 'Başlayalım',
+                                    code: interviewCode
+                                })
+                            });
+                            
+                            const data = await response.json();
+                            if (data.success) {
+                                addMessageToChat('assistant', data.response);
+                                await speakResponse(data.response);
+                                updateStatus('Dinleniyor...', 'idle');
+                                updateAvatarState('idle');
+                                
+                                // Butonu kaldır
+                                document.getElementById('startButtonContainer').remove();
+                            } else {
+                                showError(data.error || 'Yanıt alınamadı');
+                                updateStatus('Dinleniyor...', 'idle');
+                                updateAvatarState('idle');
+                            }
+                        } catch (error) {
+                            console.error('Başlama hatası:', error);
+                            showError('Başlangıç başlatılamadı');
+                            updateStatus('Dinleniyor...', 'idle');
+                            updateAvatarState('idle');
+                        }
+                    };
+                    
+                    startContainer.appendChild(startButton);
+                    document.querySelector('.chat-container').appendChild(startContainer);
+                    
                     // Süreyi başlat
                     startTimer();
                     
@@ -2113,71 +2212,10 @@
             if (endInterviewButton) {
                 endInterviewButton.addEventListener('click', async function() {
                     if (confirm('Mülakatı bitirmek istediğinizden emin misiniz?')) {
-                        try {
-                            // Kamera ve ses kaydını durdur
-                            stopCamera();
-                            stopRecording();
-                            
-                            // Sunucuya mülakatı bitir bildirimi gönder
-                            const response = await fetch('/end_interview', {
-                                method: 'POST',
-                                headers: {
-                                    'Content-Type': 'application/json'
-                                },
-                                body: JSON.stringify({
-                                    code: interviewCode,
-                                    conversation_history: chatHistory
-                                })
-                            });
-                            
-                            const data = await response.json();
-                            if (data.success) {
-                                // Rapor oluştur
-                                const reportResponse = await fetch('/generate_report', {
-                                    method: 'POST',
-                                    headers: {
-                                        'Content-Type': 'application/json'
-                                    },
-                                    body: JSON.stringify({
-                                        interview_code: interviewCode,
-                                        conversation_history: chatHistory
-                                    })
-                                });
-                                
-                                const reportData = await reportResponse.json();
-                                if (reportData.success && reportData.report_url) {
-                                    // Rapor indirme butonunu ekle
-                                    addDownloadButton(reportData.report_url);
-                                    showSuccess('Mülakat tamamlandı ve rapor oluşturuldu!');
-                                } else {
-                                    showError('Rapor oluşturulurken bir hata oluştu: ' + reportData.error);
-                                }
-                            } else {
-                                showError('Mülakat sonlandırılırken bir hata oluştu: ' + data.error);
-                            }
-                        } catch (error) {
-                            console.error('Mülakat bitirme hatası:', error);
-                            showError('Mülakat sonlandırılırken bir hata oluştu');
-                        }
+                        await endInterview();
                     }
                 });
             }
-        }
-            
-            // Mülakat başladıktan 5 dakika sonra bitirme butonunu göster
-            function showEndInterviewButton() {
-                setTimeout(() => {
-                    const endInterviewButton = document.getElementById('endInterviewButton');
-                    if (endInterviewButton) {
-                        endInterviewButton.classList.remove('hidden');
-                    }
-                }, 300000); // 5 dakika
-            }
-
-            // Mülakat başlatma butonuna tıklandığında bitirme butonunu gösterme zamanlayıcısını başlat
-            modeButton.addEventListener('click', function() {
-                showEndInterviewButton();
-            });
         }
 
         // Son soru kontrolü ve bitirme butonu gösterme
@@ -2197,8 +2235,10 @@
         // Her yanıt alındığında son soru kontrolü yap
         async function processResponse(response) {
             if (response.success) {
+                // Önce mesajı ekle
                 addMessageToChat('assistant', response.response);
-                await speakResponse(response.response);
+                
+                // Burada seslendirme yok - seslendirme process_audio içinde zaten yapılıyor
                 
                 // Son soru kontrolü
                 checkLastQuestion();

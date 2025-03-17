@@ -1,0 +1,132 @@
+{
+  "code": "DB92NFVV",
+  "candidate_name": "Süleyman Kaplan",
+  "position": "CEO",
+  "requirements": [],
+  "questions": [
+    "- \"Merhaba Süleyman Bey, hoş geldiniz. Kendinizden ve şimdiye kadar edindiğiniz deneyimlerden biraz bahseder misiniz?\"",
+    "- \"CEO pozisyonuna başvurmanızın arkasında yatan motivasyonunuz nedir? Bu pozisyon sizin için ne anlam ifade ediyor?\"",
+    "- \"Özellikle stratejik planlama ve yönetim konularında neleri başardınız? Bize bu konudaki deneyimlerinizi anlatır mısınız?\"",
+    "- \"Bir şirketin zorluklarla karşılaştığı bir durumu ele alalım. Bu tür bir durumda problem çözme yaklaşımınız nasıl olurdu?\"",
+    "- \"Bir lider olarak, takımınızla iletişim kurma ve onları yönetme tarzınızı nasıl tanımlarsınız? Takım çalışmalarına verdiğiniz önemi bizimle paylaşabilir misiniz?\""
+  ],
+  "created_at": "2025-03-17T14:13:58.636434",
+  "status": "completed",
+  "started_at": "2025-03-17T14:14:11.396168",
+  "photos": [
+    {
+      "filename": "20250317141417.jpg",
+      "timestamp": "2025-03-17T11:14:17.793Z",
+      "path": "DB92NFVV_photos/20250317141417.jpg"
+    },
+    {
+      "filename": "20250317141437.jpg",
+      "timestamp": "2025-03-17T11:14:37.811Z",
+      "path": "DB92NFVV_photos/20250317141437.jpg"
+    },
+    {
+      "filename": "20250317141502.jpg",
+      "timestamp": "2025-03-17T11:15:02.796Z",
+      "path": "DB92NFVV_photos/20250317141502.jpg"
+    },
+    {
+      "filename": "20250317141800.jpg",
+      "timestamp": "2025-03-17T11:18:00.602Z",
+      "path": "DB92NFVV_photos/20250317141800.jpg"
+    },
+    {
+      "filename": "20250317141815.jpg",
+      "timestamp": "2025-03-17T11:18:15.594Z",
+      "path": "DB92NFVV_photos/20250317141815.jpg"
+    },
+    {
+      "filename": "20250317141835.jpg",
+      "timestamp": "2025-03-17T11:18:35.600Z",
+      "path": "DB92NFVV_photos/20250317141835.jpg"
+    },
+    {
+      "filename": "20250317141900.jpg",
+      "timestamp": "2025-03-17T11:19:00.587Z",
+      "path": "DB92NFVV_photos/20250317141900.jpg"
+    },
+    {
+      "filename": "20250317141925.jpg",
+      "timestamp": "2025-03-17T11:19:25.573Z",
+      "path": "DB92NFVV_photos/20250317141925.jpg"
+    },
+    {
+      "filename": "20250317141940.jpg",
+      "timestamp": "2025-03-17T11:19:40.581Z",
+      "path": "DB92NFVV_photos/20250317141940.jpg"
+    },
+    {
+      "filename": "20250317142000.jpg",
+      "timestamp": "2025-03-17T11:20:00.579Z",
+      "path": "DB92NFVV_photos/20250317142000.jpg"
+    },
+    {
+      "filename": "20250317142015.jpg",
+      "timestamp": "2025-03-17T11:20:15.579Z",
+      "path": "DB92NFVV_photos/20250317142015.jpg"
+    },
+    {
+      "filename": "20250317142030.jpg",
+      "timestamp": "2025-03-17T11:20:30.578Z",
+      "path": "DB92NFVV_photos/20250317142030.jpg"
+    },
+    {
+      "filename": "20250317142049.jpg",
+      "timestamp": "2025-03-17T11:20:49.763Z",
+      "path": "DB92NFVV_photos/20250317142049.jpg"
+    },
+    {
+      "filename": "20250317142105.jpg",
+      "timestamp": "2025-03-17T11:21:05.578Z",
+      "path": "DB92NFVV_photos/20250317142105.jpg"
+    },
+    {
+      "filename": "20250317142130.jpg",
+      "timestamp": "2025-03-17T11:21:30.579Z",
+      "path": "DB92NFVV_photos/20250317142130.jpg"
+    }
+  ],
+  "ended_at": "2025-03-17T14:15:07.170718",
+  "conversation_history": [
+    {
+      "role": "assistant",
+      "content": "Merhaba, mülakata başlamak için 'Başlayalım' yazabilir veya sesli olarak 'Başlayalım' diyebilirsiniz. Mülakata başlamak için sistem bu kelimeyi duymalıdır."
+    },
+    {
+      "role": "user",
+      "content": "Başlayalım."
+    },
+    {
+      "role": "assistant",
+      "content": "Merhaba Süleyman Kaplan, CEO pozisyonu için mülakatımıza hoş geldiniz.\n\nÖzgeçmişinizde belirttiğiniz bilgilere dayanarak, pozisyonun gerektirdiği yetkinlikler hakkında konuşacağız.\n\nİlk olarak, - \"Merhaba Süleyman Bey, hoş geldiniz. Kendinizden ve şimdiye kadar edindiğiniz deneyimlerden biraz bahseder misiniz?\""
+    },
+    {
+      "role": "user",
+      "content": "Biz tatlıyız."
+    },
+    {
+      "role": "assistant",
+      "content": "İlginç, peki bu konuda başka neler söylemek istersiniz?"
+    }
+  ],
+  "report_path": "reports/report_DB92NFVV_20250317_141538.pdf",
+  "report_url": "/reports/report_DB92NFVV_20250317_141538.pdf",
+  "evaluation_data": {
+    "scores": {
+      "technical": 2,
+      "communication": 3,
+      "problem_solving": 1,
+      "experience": 2
+    },
+    "sections": {
+      "strengths": "**  \nBu aşamada, Süleyman Bey'in mülakata katılım göstermesi dışında belirgin bir güçlü yön tespit edilememiştir.",
+      "improvements": "**  \n- **Profesyonellik:** Süleyman Bey'in mülakat gibi profesyonel bir ortamda daha uygun ve ciddi yanıtlar vermesi gerekir.\n- **Açık İletişim:** Kendisi ve deneyimleri hakkında daha açık ve detaylı bilgi vermesi önemlidir.\n- **Teknik ve Mesleki Bilgi:** Pozisyonun gerektirdiği teknik ve liderlik yetkinliklerini somut örneklerle açıklaması gerekmektedir.",
+      "overall": ""
+    },
+    "overall_score": 0.0
+  }
+}

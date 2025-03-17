@@ -1,0 +1,48 @@
+{
+  "code": "AAWAUWQK",
+  "candidate_name": "Süleyman Kaplan",
+  "position": "CEO",
+  "requirements": [],
+  "questions": [
+    "- Merhaba Süleyman Bey, hoş geldiniz. Öncelikle, kariyer yolculuğunuz boyunca edindiğiniz deneyimler hakkında biraz bilgi alabilir miyim?",
+    "- CEO pozisyonuna başvurmanızın arkasında yatan motivasyonunuz nedir? Bu pozisyonda kendinizi nasıl bir gelecek vizyonunda görüyorsunuz?",
+    "- Süleyman Bey, bu seviyede bir pozisyonda karşılaşabileceğiniz teknik zorluklardan ve bu zorluklarla nasıl başa çıktığınızdan bahsedebilir misiniz?",
+    "- Zor bir karar verme sürecinde sorunları nasıl ele alıyor ve çözüm üretiyorsunuz? Bir örnek vererek bu süreci bize anlatabilir misiniz?",
+    "- Takım çalışmasına ve iletişime ne kadar önem veriyorsunuz? Geçmişte bir takımın parçası olarak veya lideri olarak nasıl bir deneyiminiz oldu? Bir takımın başarısı için nelerin önemli olduğunu düşünüyorsunuz?"
+  ],
+  "created_at": "2025-03-17T14:08:06.819141",
+  "status": "completed",
+  "started_at": "2025-03-17T14:08:14.086720",
+  "photos": [
+    {
+      "filename": "20250317140820.jpg",
+      "timestamp": "2025-03-17T11:08:20.492Z",
+      "path": "AAWAUWQK_photos/20250317140820.jpg"
+    },
+    {
+      "filename": "20250317140840.jpg",
+      "timestamp": "2025-03-17T11:08:40.490Z",
+      "path": "AAWAUWQK_photos/20250317140840.jpg"
+    },
+    {
+      "filename": "20250317140900.jpg",
+      "timestamp": "2025-03-17T11:09:00.484Z",
+      "path": "AAWAUWQK_photos/20250317140900.jpg"
+    }
+  ],
+  "ended_at": "2025-03-17T14:09:01.249108",
+  "conversation_history": [
+    {
+      "role": "assistant",
+      "content": "Merhaba, mülakata başlamak için 'Başlayalım' yazabilir veya sesli olarak 'Başlayalım' diyebilirsiniz. Mülakata başlamak için sistem bu kelimeyi duymalıdır."
+    },
+    {
+      "role": "user",
+      "content": "Başlayalım."
+    },
+    {
+      "role": "assistant",
+      "content": "Merhaba Süleyman Kaplan, CEO pozisyonu için mülakatımıza hoş geldiniz.\n\nÖzgeçmişinizde belirttiğiniz bilgilere dayanarak, pozisyonun gerektirdiği yetkinlikler hakkında konuşacağız.\n\nİlk olarak, - Merhaba Süleyman Bey, hoş geldiniz. Öncelikle, kariyer yolculuğunuz boyunca edindiğiniz deneyimler hakkında biraz bilgi alabilir miyim?"
+    }
+  ]
+}
